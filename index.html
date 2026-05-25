@@ -3231,6 +3231,68 @@ function catchChance(c) {
   return Math.min(0.98, chance);
 }
 
+function catchBreakdown(c) {
+  var base = CATCH_BASE[c.rarity] || 0.5;
+  var depth = BIOME_DEPTH[S.activeBiome ? S.activeBiome.id : null] || 0;
+  var ts = totalStats();
+  var affinity = TYPE_AFFINITY[c.type] || [];
+  var statBonus  = affinity.reduce(function(s,k){ return s + thresholdBonus(ts[k]||0, STAT_TIERS); }, 0);
+  var powerBonus = thresholdBonus(Object.values(ts).reduce(function(a,b){return a+b;},0), POWER_TIERS);
+  var wardenBonus = (S.wardenMarks && S.wardenMarks[c.type]) ? S.wardenMarks[c.type] : 0;
+  return {
+    base:     Math.max(0.05, base * Math.pow(DEPTH_PENALTY, depth)),
+    scale:    RARITY_BONUS_SCALE[c.rarity] || 1.0,
+    depth:    depth,
+    stats:    statBonus,
+    power:    powerBonus,
+    state:    getCatchStateMod(),
+    streak:   Math.min(0.10 * getClassStreakMultiplier(), (S.huntStreak||0) * 0.01 * getClassStreakMultiplier()),
+    bond:     bondCatchBonus(c.type),
+    season:   getSeasonalBonus(c.type),
+    passives: getChoiceCatchBonus() + getRivalAllyBonus() + wardenBonus
+              + getAbilityCatchBonus(c.type) + (S.activeBiome ? getAbilityBiomeCatchBonus(S.activeBiome.id) : 0)
+              + getClassCatchBonus(c.type),
+    approach: S.approachMod || 0,
+  };
+}
+
+function buildCatchBreakdownHtml(c, totalChance, curState, col) {
+  var bd = catchBreakdown(c);
+  var sc = bd.scale;
+  var p = function(v){ return Math.round(v * 100); };
+  var fmt = function(v){ return (v >= 0 ? '+' : '') + p(v) + '%'; };
+  var rc = RARITIES[c.rarity] || {};
+  var depthLabel = bd.depth ? ', depth ' + bd.depth : '';
+  var rows = [['Base (' + (rc.label||c.rarity) + depthLabel + ')', p(bd.base) + '%', 'var(--text-dim)']];
+  var bonusRows = [
+    ['Stats (' + (TYPE_AFFINITY[c.type]||[]).map(function(s){return s.toUpperCase();}).join('/') + ')', bd.stats],
+    ['Power',           bd.power],
+    [curState + ' state', bd.state],
+    ['Streak ×' + (S.huntStreak||0), bd.streak],
+    ['Bond affinity',   bd.bond],
+    ['Season',          bd.season],
+    ['Passives',        bd.passives],
+    ['Approach',        bd.approach],
+  ];
+  bonusRows.forEach(function(r){
+    if (r[1] === 0) return;
+    rows.push([r[0], fmt(r[1] * sc), r[1] > 0 ? col : '#f87171']);
+  });
+  var rowsHtml = rows.map(function(r){
+    return '<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:9px;padding:2px 0;color:'+r[2]+'">'
+      + '<span>' + r[0] + '</span><span style="font-weight:600;font-variant-numeric:tabular-nums">' + r[1] + '</span></div>';
+  }).join('');
+  var scaleNote = sc < 1.0
+    ? '<div style="font-size:8px;color:var(--text-muted);margin-top:3px;font-style:italic">Bonuses ×' + sc.toFixed(2) + ' (' + c.rarity + ' resistance)</div>'
+    : '';
+  return '<div style="margin-top:6px;padding:8px 10px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid rgba(255,255,255,0.07);text-align:left">'
+    + rowsHtml
+    + '<div style="border-top:1px solid rgba(255,255,255,0.09);margin:4px 0"></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:10px;color:'+col+';font-weight:700">'
+    + '<span>Total</span><span>' + p(totalChance) + '%</span></div>'
+    + scaleNote + '</div>';
+}
+
 function makeComp(type, rarity) {
   const idx = RARITY_ORDER.indexOf(rarity);
   if (Math.random() < CAKE_MAT_CHANCE) {
@@ -8277,23 +8339,10 @@ function renderHunt() {
       <div style="font-size:11px;color:var(--text-dim);font-style:italic;margin:8px 0 4px;max-width:260px">${c.lore}</div>
       <div style="display:flex;align-items:center;gap:12px;margin:8px 0">
         <div>
-          <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px">CATCH CHANCE</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:3px" onclick="S._catchBreakdown=!S._catchBreakdown;renderHunt()">CATCH CHANCE <span style="opacity:0.4;font-size:8px">${S._catchBreakdown ? '▴' : '▾'}</span></div>
           <div class="catch-bar"><div class="catch-fill" style="width:${Math.round(chance*100)}%;background:${col}"></div></div>
-          <div style="font-size:11px;color:${col};font-weight:600">${S.phaseShiftUntil && Date.now() < S.phaseShiftUntil ? '??%' : Math.round(chance*100)+'%'}</div>
-          <div style="font-size:9px;color:var(--text-muted);margin-top:2px">${
-            (function(){
-              const ts2 = totalStats();
-              const aff = TYPE_AFFINITY[c.type] || [];
-              const sb = aff.reduce(function(s,k){return s+thresholdBonus(ts2[k]||0,STAT_TIERS);},0);
-              const pw = thresholdBonus(Object.values(ts2).reduce(function(a,b){return a+b;},0), POWER_TIERS);
-              const parts = [];
-              if (sb > 0) parts.push('+' + Math.round(sb*100) + '% stats');
-              if (pw > 0) parts.push('+' + Math.round(pw*100) + '% power');
-              var sm = getCatchStateMod(); if (sm !== 0) parts.push((sm>0?'+':'')+Math.round(sm*100)+'% '+_curState);
-              if (S.approachMod) parts.push((S.approachMod>0?'+':'')+Math.round(S.approachMod*100)+'% approach');
-              return parts.length ? parts.join(' · ') : 'choose approach';
-            })()
-          }</div>
+          <div style="font-size:11px;color:${col};font-weight:600;cursor:pointer" onclick="S._catchBreakdown=!S._catchBreakdown;renderHunt()">${S.phaseShiftUntil && Date.now() < S.phaseShiftUntil ? '??%' : Math.round(chance*100)+'%'}</div>
+          ${S._catchBreakdown && !(S.phaseShiftUntil && Date.now() < S.phaseShiftUntil) ? buildCatchBreakdownHtml(c, chance, _curState, col) : ''}
         </div>
         <div>
           <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px">ATTEMPTS ${S.huntCakeBonus ? '<span style=\"color:#f9c74f;font-size:8px\">+' + S.huntCakeBonus + ' cake</span>' : ''}</div>
