@@ -118,8 +118,24 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 .void-fill{height:100%;background:linear-gradient(90deg,var(--purple),#c084fc);transition:width .4s}
 
 /* TOAST */
-.toast{position:fixed;top:40%;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--gold-dim);border-radius:12px;padding:10px 20px;z-index:200;font-size:13px;font-weight:600;color:var(--gold);pointer-events:none;transition:opacity .3s;white-space:nowrap;max-width:90vw;text-overflow:ellipsis;overflow:hidden}
-.toast.hidden{opacity:0}
+@keyframes toast-in{from{transform:translateX(-50%) translateY(8px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+.toast{position:fixed;top:40%;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--gold-dim);border-radius:12px;padding:10px 20px;z-index:200;font-size:13px;font-weight:600;color:var(--gold);pointer-events:none;white-space:nowrap;max-width:90vw;text-overflow:ellipsis;overflow:hidden;animation:toast-in .22s ease-out}
+.toast.hidden{opacity:0;transition:opacity .28s;animation:none}
+.toast-capture{border-color:rgba(249,199,79,.55);color:#f9c74f;box-shadow:0 8px 32px rgba(0,0,0,.6),0 0 18px rgba(249,199,79,.12)}
+.toast-escape {border-color:rgba(251,146,60,.45);color:#fb923c}
+.toast-resist {border-color:rgba(148,163,184,.25);color:var(--text-dim);font-weight:400}
+.toast-release{border-color:rgba(248,113,113,.4);color:#f87171}
+.toast-essence{border-color:rgba(232,121,249,.5);color:#e879f9;box-shadow:0 8px 32px rgba(0,0,0,.6),0 0 18px rgba(232,121,249,.12)}
+.toast-success{border-color:rgba(74,222,128,.4);color:#4ade80}
+.toast-error  {border-color:rgba(248,113,113,.4);color:#f87171}
+.toast-system {border-color:rgba(148,163,184,.18);color:var(--text-muted);font-weight:400}
+/* CREATURE RESULT ANIMATIONS */
+@keyframes capture-burst{0%{transform:scale(1);opacity:1;filter:brightness(1)}20%{transform:scale(1.1);opacity:1;filter:brightness(2.2) saturate(1.4)}55%{transform:scale(1.2);opacity:.65;filter:brightness(2.5)}100%{transform:scale(.8);opacity:0;filter:brightness(4) blur(3px)}}
+@keyframes creature-flee{0%{transform:translateY(0) scale(1);opacity:1;filter:blur(0)}20%{transform:translateY(-5px) scale(1.04);opacity:.9}100%{transform:translateY(-28px) scale(.82);opacity:0;filter:blur(3px)}}
+@keyframes creature-resist{0%,100%{transform:translateX(0)}15%{transform:translateX(-8px)}30%{transform:translateX(7px)}45%{transform:translateX(-5px)}60%{transform:translateX(5px)}78%{transform:translateX(-2px)}}
+.capture-burst{animation:capture-burst .58s cubic-bezier(.4,0,.2,1) forwards}
+.creature-flee{animation:creature-flee .48s ease-in forwards}
+.creature-resist{animation:creature-resist .38s ease-out}
 
 /* SECTION HEADERS */
 .section-divider{display:flex;align-items:center;gap:10px;margin:8px 0}
@@ -3031,10 +3047,13 @@ function stars(count, color) {
 
 let toastTimer;
 window.toastMsg = function(msg){ toast(msg); };
-function toast(msg) {
+function toast(msg, type) {
   const el = document.getElementById('toast');
   el.textContent = msg;
-  el.classList.remove('hidden');
+  el.className = 'toast' + (type ? ' toast-' + type : '');
+  el.style.animation = 'none';
+  el.offsetHeight; // force reflow to restart slide-in
+  el.style.animation = '';
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.add('hidden'), 2500);
 }
@@ -3415,7 +3434,7 @@ function doCapture() {
     const captured = S.encounter;
     const rosterFull = S.roster.length >= getRosterMax();
     if (rosterFull && S.void_.length >= getVoidMax()) {
-      toast('Roster and Void are both full!');
+      toast('Roster and Void are both full!', 'error');
       return;
     }
     if (rosterFull) {
@@ -3439,6 +3458,8 @@ function doCapture() {
     S.huntStreak = (S.huntStreak || 0) + 1;
     if (S.huntStreak === 5)  setTimeout(function(){ earnFieldNotes(FIELD_NOTE_SOURCES.streak_5,  '5 streak'); }, 1000);
     if (S.huntStreak === 10) setTimeout(function(){ earnFieldNotes(FIELD_NOTE_SOURCES.streak_10, '10 streak'); }, 1000);
+    var _img = document.getElementById('encounter-creature-img');
+    if (_img) _img.classList.add('capture-burst');
     if (captured.unique) sfxUnique(); else sfxCapture();
     FX.capture(captured.type, !!captured.unique); setTimeout(function(){ updateHuntZoneType(null); }, 600);
     checkStoryTriggers();
@@ -3447,51 +3468,55 @@ function doCapture() {
     autoSave();
     clearPatienceTimer(); S.encounter = null; S.fails = 0; S.captureResult = null;
     renderPassiveStats();
-    renderHunt();
-    if (captured.unique) {
-      S.pendingName = captured.uid;
-      showNameModal(captured);
-    } else {
-      if (captured._firstHunt) {
-      toast('✦ ' + captured.name + ' — documented. The codex has its first entry.');
-      setTimeout(function(){
-        showMicroPrompt('encounter-zone-inner',
-          'Well done. Each capture adds to the codex. Tap a biome to hunt again.', 5000);
-      }, 1200);
-    } else {
-      toast(toastCapture(captured.name, rosterFull, captured.bonded) + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''));
-    }
-    }
+    var _cap = captured, _rf = rosterFull;
+    setTimeout(function(){
+      renderHunt();
+      if (_cap.unique) {
+        S.pendingName = _cap.uid;
+        showNameModal(_cap);
+      } else if (_cap._firstHunt) {
+        toast('✦ ' + _cap.name + ' — documented. The codex has its first entry.', 'capture');
+        setTimeout(function(){
+          showMicroPrompt('encounter-zone-inner',
+            'Well done. Each capture adds to the codex. Tap a biome to hunt again.', 5000);
+        }, 1200);
+      } else {
+        toast(toastCapture(_cap.name, _rf, _cap.bonded) + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+      }
+    }, 620);
   } else {
     S.fails++;
     const maxFails = Math.max(1, (FLEE_AFTER[S.encounter.rarity] || 2) + (S.huntCakeBonus || 0) + resonanceFleeModifier(S.encounter.type));
+    var _img2 = document.getElementById('encounter-creature-img');
     if (S.fails >= maxFails) {
+      if (_img2) _img2.classList.add('creature-flee');
       S.huntStreak = 0;
       sfxEscape();
       stopHuntAnim();
-      // Chance to drop a component on escape
       var compDropChance = ENCOUNTER_DROP_CHANCE + getComponentDropBonus() + getChoiceCompDropBonus();
       getActiveBonds().forEach(function(b){ if(b.bonus.type==='compDrop') compDropChance += b.bonus.v; });
       if (S.activeBiome && biomeMasteryTier(S.activeBiome.id) >= 2) compDropChance += 0.15;
       if (Math.random() < compDropChance) {
         var escComp = makeComp(S.encounter.type, S.encounter.rarity);
         S.components.push(escComp);
-        toast(toastEscape(S.encounter.name, escComp.name));
+        toast(toastEscape(S.encounter.name, escComp.name), 'escape');
       } else {
-        FX.escape(S.encounter ? S.encounter.type : 'flora'); toast(toastEscape(S.encounter.name, null));
+        FX.escape(S.encounter ? S.encounter.type : 'flora');
+        toast(toastEscape(S.encounter.name, null), 'escape');
       }
       clearPatienceTimer(); S.encounter = null; S.fails = 0; S.captureResult = null; updateHuntZoneType(null);
+      setTimeout(renderHunt, 480);
     } else {
+      if (_img2) _img2.classList.add('creature-resist');
       sfxResist(); FX.resist(S.encounter ? S.encounter.type : 'flora');
-      toast(toastResist(maxFails - S.fails));
-      // Small chance to drop a component on resist
+      toast(toastResist(maxFails - S.fails), 'resist');
       if (Math.random() < ENCOUNTER_DROP_CHANCE) {
         var dropComp = makeComp(S.encounter.type, S.encounter.rarity);
         S.components.push(dropComp);
         toast(S.encounter.name + ' dropped: ' + dropComp.name + '!');
       }
+      setTimeout(renderHunt, 380);
     }
-    renderHunt();
   }
 }
 
@@ -3528,7 +3553,7 @@ function recallFromVoid(uid) {
   else if (S.tab === 'hunt') renderHunt();
   if (S.tab === 'void') renderVoid();
   renderPassiveStats();
-  toast(c.name + ' recalled.');  autoSave();
+  toast(c.name + ' recalled.', 'success');  autoSave();
 }
 
 
@@ -3551,7 +3576,7 @@ function releaseCreature(uid, fromVoid) {
   if (S.tab === 'void') renderVoid();
   if (S.tab === 'craft') renderCraft();
   renderPassiveStats();
-  toast(c.name + ' released. Received: ' + comp.name);  autoSave();
+  toast(c.name + ' released. Received: ' + comp.name, 'release');  autoSave();
 }
 
 
@@ -3640,7 +3665,7 @@ function bulkReleaseFromVoid(uids) {
   renderVoid();
   renderPassiveStats();
   if (S.tab==='craft') renderCraft();
-  toast('Released '+n+' creature'+(n!==1?'s':'')+'. Got '+totalComps+' component'+(totalComps!==1?'s':'')+' back.');
+  toast('Released '+n+' creature'+(n!==1?'s':'')+'. Got '+totalComps+' component'+(totalComps!==1?'s':'')+' back.', 'release');
   autoSave();
 }
 
@@ -4906,7 +4931,7 @@ function doApproach() {
     const captured = S.encounter;
     const rosterFull = S.roster.length >= getRosterMax();
     if (rosterFull && S.void_.length >= getVoidMax()) {
-      toast('Roster and Void are both full!'); S.approachMod = 0; S.approachBond = false; return;
+      toast('Roster and Void are both full!', 'error'); S.approachMod = 0; S.approachBond = false; return;
     }
     if (S.approachBond) { captured.bonded = true; setTimeout(function(){ earnFieldNotes(FIELD_NOTE_SOURCES.bond_success, 'bonded'); }, 600); }
     // Track daily sighting
@@ -4934,31 +4959,38 @@ function doApproach() {
       checkMasteryMilestones(captured.capturedIn);
     }
     S.huntStreak = (S.huntStreak || 0) + 1;
+    var _aImg = document.getElementById('encounter-creature-img');
+    if (_aImg) _aImg.classList.add('capture-burst');
     if (captured.unique) sfxUnique(); else sfxCapture();
     FX.capture(captured.type, !!captured.unique);
     setTimeout(function(){ updateHuntZoneType(null); }, 600);
     checkStoryTriggers(); checkTutorialTriggers(); checkUnlocks(); autoSave();
     S.encounter = null; S.fails = 0; S.captureResult = null;
     S.approachMod = 0; S.approachBond = false;
-    renderPassiveStats(); renderHunt();
-  setTimeout(checkContextualHints, 150);
-    if (captured.unique) {
-      S.pendingName = captured.uid;
-      showNameModal(captured);
-    } else {
-      var bondNote = captured.bonded ? ' 🤝 bonded' : '';
-      toast('✨ ' + captured.name + (rosterFull ? ' → Void' : ' captured!') + bondNote + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''));
-    }
+    renderPassiveStats();
+    var _aCap = captured, _aRf = rosterFull;
+    setTimeout(function(){
+      renderHunt();
+      setTimeout(checkContextualHints, 150);
+      if (_aCap.unique) {
+        S.pendingName = _aCap.uid;
+        showNameModal(_aCap);
+      } else {
+        var bondNote = _aCap.bonded ? ' 🤝 bonded' : '';
+        toast('✨ ' + _aCap.name + (_aRf ? ' → Void' : ' captured!') + bondNote + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+      }
+    }, 620);
   } else {
     // Fail
     S.fails++;
-    sfxResist(); FX.resist(S.encounter ? S.encounter.type : 'flora');
     if (S.encounter) trackCreatureAttempt(S.encounter.id, false);
-    // Fightback triggers on odd fails (1st, 3rd, ...) — not on the final escape
     if (S.fails % 2 === 1 && S.encounter && S.fails < maxFails) {
       triggerFightback(S.encounter, null);
     }
+    var _aImg2 = document.getElementById('encounter-creature-img');
     if (S.fails >= maxFails) {
+      if (_aImg2) _aImg2.classList.add('creature-flee');
+      sfxResist(); FX.resist(S.encounter ? S.encounter.type : 'flora');
       clearPatienceTimer();
       S.huntStreak = 0; sfxEscape();
       var compDropChance = ENCOUNTER_DROP_CHANCE;
@@ -4967,23 +4999,27 @@ function doApproach() {
       if (Math.random() < compDropChance) {
         var escComp = makeComp(S.encounter.type, S.encounter.rarity);
         S.components.push(escComp);
-        toast(S.encounter.name + ' fled — but left behind: ' + escComp.name + '!');
+        toast(S.encounter.name + ' fled — but left behind: ' + escComp.name + '!', 'escape');
       } else {
         FX.escape(S.encounter ? S.encounter.type : 'flora');
-        toast(S.encounter.name + ' broke free and fled!');
+        toast(S.encounter.name + ' broke free and fled!', 'escape');
       }
       updateHuntZoneType(null);
       S.encounter = null; S.fails = 0; S.captureResult = null;
+      S.approachMod = 0; S.approachBond = false;
+      setTimeout(renderHunt, 480);
     } else {
-      toast('Resisted! ' + (maxFails - S.fails) + ' attempts left.');
+      if (_aImg2) _aImg2.classList.add('creature-resist');
+      sfxResist(); FX.resist(S.encounter ? S.encounter.type : 'flora');
+      toast('Resisted! ' + (maxFails - S.fails) + ' attempts left.', 'resist');
       if (Math.random() < ENCOUNTER_DROP_CHANCE) {
         var dropComp = makeComp(S.encounter.type, S.encounter.rarity);
         S.components.push(dropComp);
         toast(S.encounter.name + ' dropped: ' + dropComp.name + '!');
       }
+      S.approachMod = 0; S.approachBond = false;
+      setTimeout(renderHunt, 380);
     }
-    S.approachMod = 0; S.approachBond = false;
-    renderHunt();
   }
 }
 
@@ -5752,7 +5788,7 @@ function earnFieldNotes(amount, reason) {
 
 function earnEssence(amount, reason) {
   S.essence = (S.essence || 0) + amount;
-  toast('💜 +' + amount + ' Essence' + (reason ? ' — ' + reason : ''));
+  toast('💜 +' + amount + ' Essence' + (reason ? ' — ' + reason : ''), 'essence');
   autoSave();
   renderPassiveStats();
 }
