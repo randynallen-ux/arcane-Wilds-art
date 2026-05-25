@@ -2057,7 +2057,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
         <div id="fn-exclaim" style="font-family:Cinzel,serif;font-size:22px;font-weight:700;color:#1a0e00;margin-bottom:8px"></div>
         <div style="font-size:9px;letter-spacing:3px;color:#8b6d3a;margin-bottom:6px;font-family:Raleway,sans-serif">📓 FIELD NOTE — FIRST ENCOUNTER</div>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-          <div id="fn-emoji" style="font-size:40px;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.15))"></div>
+          <div id="fn-emoji" style="display:flex;justify-content:center;margin:4px 0"></div>
           <div>
             <div id="fn-name" style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:#1a0e00"></div>
             <div id="fn-meta" style="font-size:10px;color:#6b4f1a;letter-spacing:1px;margin-top:2px"></div>
@@ -3737,7 +3737,7 @@ function renderBestiary() {
           var c  = CREATURES.find(function(x){ return x.id === id; });
           if (!ab || !c) return '';
           return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
-            + '<span style="font-size:16px">' + c.emoji + '</span>'
+            + creatureThumbHtml(c, 24)
             + '<div><div style="font-size:10px;font-weight:600;color:var(--gold)">' + ab.name + '</div>'
             + '<div style="font-size:10px;color:var(--text-dim);font-family:Inter,sans-serif">' + ab.desc + '</div></div>'
             + '</div>';
@@ -3773,7 +3773,7 @@ function renderBestiary() {
         }).join('');
 
         var header = '<div class="bestiary-entry-header" onclick="toggleBestiaryEntry(\'' + entryId + '\')">'
-          + '<span style="font-size:' + (known?'22':'20') + 'px;' + (known?'':'filter:grayscale(1);opacity:0.25') + '">' + c.emoji + '</span>'
+          + (known ? creatureThumbHtml(c, 32) : '<span style="font-size:18px;filter:grayscale(1);opacity:0.25">' + c.emoji + '</span>')
           + '<div style="flex:1">'
           + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
           + '<span style="font-size:12px;font-weight:600;color:' + (known?rc.color:'var(--text-muted)') + '">' + (known?c.name:'???') + '</span>'
@@ -3901,7 +3901,7 @@ function showNameModal(creature) {
   var col = creature.unique ? creature.unique.color : rc.color;
   document.getElementById('name-modal-content').innerHTML =
     '<div style="font-size:9px;letter-spacing:3px;color:' + col + ';margin-bottom:6px">✦ UNIQUE ' + creature.rarity.toUpperCase() + ' DISCOVERED</div>'
-    + '<div style="font-size:48px;margin:8px 0;filter:drop-shadow(0 0 16px ' + col + ')">' + creature.emoji + '</div>'
+    + '<div style="margin:8px 0;display:flex;justify-content:center">' + creatureThumbHtml(creature, 72, {radius:'8px'}) + '</div>'
     + '<div style="font-family:Cinzel,serif;font-size:18px;color:' + col + ';font-weight:600;margin-bottom:4px">' + creature.name + '</div>'
     + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px">Colorway: ' + creature.unique.name + '</div>'
     + '<div style="font-size:11px;color:var(--text-dim);font-style:italic;margin-bottom:20px">A unique specimen. Give it a name to remember it by.</div>'
@@ -4078,6 +4078,22 @@ function creatureImgHtml(c, emojiSize) {
   }
   return '<span style="font-size:' + emojiSize + 'px;line-height:1">' + c.emoji + '</span>';
 }
+
+function creatureThumbHtml(c, sizePx, opts) {
+  var src = c.customImage || speciesArtSrc(c.id);
+  var sz = sizePx || 32;
+  var r = (opts && opts.radius !== undefined) ? opts.radius : '4px';
+  if (src) {
+    return '<span style="display:inline-block;width:' + sz + 'px;height:' + sz + 'px;'
+      + 'border-radius:' + r + ';overflow:hidden;vertical-align:middle;flex-shrink:0">'
+      + '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover" '
+      + 'onerror="this.style.display='none';this.nextSibling.style.display='inline'">'
+      + '<span style="display:none;font-size:' + Math.round(sz * 0.6) + 'px;line-height:' + sz + 'px">' + c.emoji + '</span>'
+      + '</span>';
+  }
+  return '<span style="font-size:' + Math.round(sz * 0.6) + 'px;line-height:1;vertical-align:middle">' + c.emoji + '</span>';
+}
+
 
 
 // ── DEV MODE ─────────────────────────────────────────────────────────────
@@ -5295,7 +5311,7 @@ function buildDailyCard() {
   return '<div class="daily-card">'
     + '<div class="daily-eyebrow">✦ Today\'s Sighting</div>'
     + '<div style="display:flex;align-items:center;gap:10px">'
-    + '<span style="font-size:28px">' + c.emoji + '</span>'
+    + creatureThumbHtml(c, 40)
     + '<div><div class="daily-name" style="color:' + col + '">' + c.name + '</div>'
     + '<div class="daily-meta">' + (rc ? rc.label : c.rarity) + ' · ' + c.type + biomeHint + '</div>'
     + (done
@@ -6783,7 +6799,7 @@ function showReleaseCeremony(c, uid, fromVoid) {
   el.innerHTML =
     '<div class="release-card">'
     + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">'
-    + '<span style="font-size:32px">' + c.emoji + '</span>'
+    + creatureThumbHtml(c, 48)
     + '<div>'
     + '<div style="font-family:Cinzel,serif;font-size:16px;color:' + col + ';font-weight:700">' + c.name + '</div>'
     + '<div style="font-size:10px;color:var(--text-muted);font-family:Inter,sans-serif">'
@@ -7693,7 +7709,7 @@ function showFieldNote(creature) {
   var rc = RARITIES[c.rarity] || {};
   var tc = {flora:'#3a7d44',aqua:'#1a6b8a',ember:'#a84c1a',shadow:'#5a4a8a',celestial:'#8a4a8a',mythic:'#7a1a8a'};
   var exclaim = CATCH_EXCLAMATIONS[Math.floor(Math.random() * CATCH_EXCLAMATIONS.length)];
-  document.getElementById('fn-emoji').textContent = c.emoji;
+  document.getElementById('fn-emoji').innerHTML = creatureThumbHtml(c, 60);
   document.getElementById('fn-exclaim').textContent = exclaim;
   document.getElementById('fn-name').textContent  = c.name;
   document.getElementById('fn-meta').innerHTML    = '<span style="color:' + (tc[c.type]||'#6b4f1a') + '">' + c.type.toUpperCase() + '</span> &nbsp;·&nbsp; ' + (rc.label||c.rarity).toUpperCase();
@@ -8434,7 +8450,7 @@ function renderRoster() {
     if (bondedPerc.length) {
       var contribLine = bondedPerc.map(function(c){
         return '<span class="party-ability-chip" style="border-color:rgba(232,121,249,0.3);color:#e879f9">'
-          + c.emoji + ' ' + c.name + '</span>';
+          + creatureThumbHtml(c, 20, {radius:'3px'}) + ' ' + c.name + '</span>';
       }).join('');
       perceptionContribs = '<div style="margin-bottom:6px"><div style="font-size:8px;letter-spacing:1.5px;color:rgba(232,121,249,0.6);margin-bottom:4px;font-family:Inter,sans-serif">PERCEPTION SOURCES</div>' + contribLine + '</div>';
     }
@@ -8446,7 +8462,7 @@ function renderRoster() {
     var ab = CREATURE_ABILITIES[id];
     var c  = CREATURES.find(function(x){ return x.id===id; });
     if (!ab||!c) return '';
-    return '<span class="party-ability-chip">' + c.emoji + ' ' + ab.name + '</span>';
+    return '<span class="party-ability-chip">' + creatureThumbHtml(c, 20, {radius:'3px'}) + ' ' + ab.name + '</span>';
   }).join('');
   var moreAbils = abilityIds.length > 6 ? '<span class="party-ability-chip">+' + (abilityIds.length-6) + ' more</span>' : '';
 
@@ -8520,7 +8536,7 @@ function renderVoid() {
     + '<div style="width:' + pct + '%;height:100%;background:var(--purple);border-radius:2px"></div>'
     + '</div></div></div>'
     + '<div class="void-featured">'
-    + '<span style="font-size:32px">' + featured.emoji + '</span>'
+    + creatureThumbHtml(featured, 48)
     + '<div><div class="void-featured-label">Notable Resident</div>'
     + '<div style="font-size:13px;font-weight:600;color:' + featCol + '">' + featured.name
     + (featured.bonded ? ' <span style="font-size:9px;color:#e879f9">🤝</span>' : '')
@@ -8677,7 +8693,7 @@ function renderCraft() {
           var col = TYPE_COL[c.type] || 'var(--text-dim)';
           var rCol = RARITIES[c.rarity] ? RARITIES[c.rarity].color : col;
           return '<div class="comp-card">' +
-            '<span style="font-size:12px">' + c.emoji + '</span>' +
+            creatureThumbHtml(c, 22, {radius:'3px'}) +
             '<span class="comp-card-name" style="color:' + rCol + '">' + c.name + '</span>' +
           '</div>';
         }).join('') +
