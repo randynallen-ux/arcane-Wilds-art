@@ -2215,6 +2215,7 @@ const BIOMES = [
 const BIOME_DEPTH = {verdant_grove:0,fernwood:0,ember_flats:0,tidal_shallows:1,ashen_ridges:1,salt_reaches:1,dusk_valleys:1,shadow_marches:2,celestial_plateau:2,deep_canopy:2,high_canopy:2,abyssal_trench:3,caldera_heart:3,obsidian_shore:3,resonance:3,hollow_throne:4,starfall_basin:4,pale_moors:4,veil_crossing:5,unmapped_glade:5};
 const DEPTH_PENALTY = 0.82;
 const CATCH_BASE = {common:.126,uncommon:.084,rare:.054,epic:.027,legendary:.012,mythic:.005};
+const RARITY_BONUS_SCALE = {common:1.00,uncommon:0.85,rare:0.70,epic:0.52,legendary:0.35,mythic:0.20};
 const FLEE_AFTER = {common:3,uncommon:3,rare:2,epic:2,legendary:1};
 const TYPE_AFFINITY = {flora:['def','mana'],aqua:['spd','mana'],ember:['atk','spd'],shadow:['def','atk'],celestial:['mana','spd']};
 
@@ -3204,32 +3205,29 @@ function catchChance(c) {
   const base = CATCH_BASE[c.rarity] || 0.5;
   const depth = BIOME_DEPTH[S.activeBiome ? S.activeBiome.id : null] || 0;
   let chance = Math.max(0.05, base * Math.pow(DEPTH_PENALTY, depth));
+
+  // Collect all bonuses, then scale by rarity resistance before adding
   const ts = totalStats();
   const affinity = TYPE_AFFINITY[c.type] || [];
+  let bonus = 0;
   affinity.forEach(function(stat) {
-    chance += thresholdBonus(ts[stat] || 0, STAT_TIERS);
+    bonus += thresholdBonus(ts[stat] || 0, STAT_TIERS);
   });
   const totalPow = Object.values(ts).reduce(function(a,b){return a+b;}, 0);
-  chance += thresholdBonus(totalPow, POWER_TIERS);
-  // State modifier (distracted = bonus, alert/restless = penalty)
-  chance += getCatchStateMod();
-  // Streak bonus: +2% per consecutive capture, max +20%
-  chance += Math.min(0.10 * getClassStreakMultiplier(), (S.huntStreak || 0) * 0.01 * getClassStreakMultiplier());
-  // Affinity bond bonus
-  chance += bondCatchBonus(c.type);
-  // Seasonal boost
-  chance += getSeasonalBonus(c.type);
-  // Choice passives
-  chance += getChoiceCatchBonus();
-  chance += getRivalAllyBonus();
-  // Warden's Mark permanent bonus
-  if (S.wardenMarks && S.wardenMarks[c.type]) chance += S.wardenMarks[c.type];
-  // Creature ability passive bonuses
-  chance += getAbilityCatchBonus(c.type);
-  if (S.activeBiome) chance += getAbilityBiomeCatchBonus(S.activeBiome.id);
-  chance += getClassCatchBonus(c.type);
-  // Approach modifier (set by stalk/lure/bond before the roll)
-  if (S.approachMod) chance += S.approachMod;
+  bonus += thresholdBonus(totalPow, POWER_TIERS);
+  bonus += getCatchStateMod();
+  bonus += Math.min(0.10 * getClassStreakMultiplier(), (S.huntStreak || 0) * 0.01 * getClassStreakMultiplier());
+  bonus += bondCatchBonus(c.type);
+  bonus += getSeasonalBonus(c.type);
+  bonus += getChoiceCatchBonus();
+  bonus += getRivalAllyBonus();
+  if (S.wardenMarks && S.wardenMarks[c.type]) bonus += S.wardenMarks[c.type];
+  bonus += getAbilityCatchBonus(c.type);
+  if (S.activeBiome) bonus += getAbilityBiomeCatchBonus(S.activeBiome.id);
+  bonus += getClassCatchBonus(c.type);
+  bonus += (S.approachMod || 0);
+
+  chance += bonus * (RARITY_BONUS_SCALE[c.rarity] || 1.0);
   return Math.min(0.98, chance);
 }
 
