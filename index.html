@@ -3564,7 +3564,9 @@ function toggleVoidSelect(uid) {
 }
 
 function voidSelectAll() {
-  S._voidSelected = S.void_.map(function(c){ return c.uid; });
+  var filter = S._voidFilter || null;
+  var candidates = filter ? S.void_.filter(function(c){ return c.type===filter; }) : S.void_;
+  S._voidSelected = candidates.map(function(c){ return c.uid; });
   renderVoid();
 }
 
@@ -8632,14 +8634,16 @@ function renderVoid() {
     return;
   }
 
-  // Sort
+  // Sort + filter
   var sort = S._voidSort || 'rarity';
+  var filter = S._voidFilter || null;
   var sorted = S.void_.slice();
   var rarityScore = {common:1,uncommon:2,rare:3,epic:4,legendary:5,mythic:6};
   if (sort === 'rarity')   sorted.sort(function(a,b){ return (rarityScore[b.rarity]||0)-(rarityScore[a.rarity]||0); });
   if (sort === 'type')     sorted.sort(function(a,b){ return a.type.localeCompare(b.type); });
   if (sort === 'bonded')   sorted.sort(function(a,b){ return (b.bonded?1:0)-(a.bonded?1:0); });
   if (sort === 'unique')   sorted.sort(function(a,b){ return (b.unique?1:0)-(a.unique?1:0); });
+  var filtered = filter ? sorted.filter(function(c){ return c.type===filter; }) : sorted;
 
   // Featured creature — rarest bonded, else rarest unique, else rarest overall
   var featured = sorted.find(function(c){ return c.bonded && ['legendary','mythic','epic'].indexOf(c.rarity)>=0; })
@@ -8647,6 +8651,21 @@ function renderVoid() {
     || sorted[0];
   var featRc  = RARITIES[featured.rarity] || {};
   var featCol = featured.unique ? featured.unique.color : (featRc.color||'var(--text)');
+
+  var VOID_TYPE_COL = {flora:'#4ade80',aqua:'#38bdf8',ember:'#f97316',shadow:'#818cf8',celestial:'#e879f9'};
+  var VOID_TYPES = ['flora','aqua','ember','shadow','celestial'];
+  var filterChips = '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">'
+    + '<button class="void-sort-btn' + (!filter?' active':'') + '" onclick="S._voidFilter=null;renderVoid()">All ' + S.void_.length + '</button>'
+    + VOID_TYPES.map(function(t){
+        var n = S.void_.filter(function(c){ return c.type===t; }).length;
+        if (!n) return '';
+        var col = VOID_TYPE_COL[t];
+        var active = filter===t;
+        return '<button class="void-sort-btn' + (active?' active':'') + '" '
+          + 'style="' + (active?'border-color:'+col+';color:'+col+';background:'+col+'1a':'') + '" '
+          + 'onclick="S._voidFilter=\'' + t + '\';renderVoid()">' + t + ' ' + n + '</button>';
+      }).filter(Boolean).join('')
+    + '</div>';
 
   var sortBtns = ['rarity','type','bonded','unique'].map(function(s) {
     return '<button class="void-sort-btn' + (sort===s?' active':'') + '" onclick="S._voidSort=\'' + s + '\';renderVoid()">'
@@ -8700,14 +8719,15 @@ function renderVoid() {
     + '</div>'
     + (getCreatureMemoryText(featured.id) ? '<div style="font-size:9px;color:var(--text-muted);font-style:italic;margin-top:2px">' + getCreatureMemoryText(featured.id) + '</div>' : '')
     + '</div></div>'
+    + filterChips
     + '<div class="void-sort-bar">' + sortBtns + '</div>'
     + selectCtrlHtml
     + '</div>';
 
-  // Render sorted list
-  var cards = sorted.map(function(c) {
-    return creatureCard(c, null, true);
-  }).join('');
+  // Render filtered + sorted list
+  var cards = filtered.length
+    ? filtered.map(function(c){ return creatureCard(c, null, true); }).join('')
+    : '<div style="text-align:center;padding:32px 16px;color:var(--text-muted);font-size:12px">No ' + filter + ' creatures in the Void.</div>';
 
   el.innerHTML = header + cards;
 }
