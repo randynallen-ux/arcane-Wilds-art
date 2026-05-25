@@ -8352,10 +8352,45 @@ function renderHunt() {
         </div>
       </div>
       ${S.roster.length >= getRosterMax() ? '<div style="font-size:11px;color:var(--gold-dim);margin-bottom:8px">Roster full — captures go to the Void</div>' : ''}
-      ${S.cakes.length > 0 && !S.huntCakeBonus ? '<div style="margin-bottom:8px"><div style="font-size:9px;color:#f9c74f;letter-spacing:1px;margin-bottom:4px">USE A LITTLE CAKE</div><div style="display:flex;gap:6px;flex-wrap:wrap">'
-        + S.cakes.map((k,i) => { var matches = !k.type || k.type === c.type; return '<button class="btn" onclick="useCake(' + i + ')" ' + (matches ? '' : 'disabled title="Only works on ' + k.type + ' creatures" ') + 'style="font-size:11px;padding:5px 10px;background:' + (matches?'rgba(249,199,79,0.15)':'rgba(255,255,255,0.04)') + ';border:1px solid ' + (matches?'rgba(249,199,79,0.4)':'var(--border)') + ';color:' + (matches?'#f9c74f':'var(--text-muted)') + ';border-radius:8px' + (matches?'':';cursor:not-allowed') + '">' + k.emoji + ' ' + k.name + ' ×' + (k.count||1) + ' <span style=\"opacity:0.7\">(' + (matches ? '+' + k.attempts + ' attempt' + (k.attempts>1?'s':'') : k.type + ' only') + ')</span></button>'; }).join('')
-        + '</div></div>' : ''}
-      ${S.huntCakeBonus ? '<div style="font-size:10px;color:#f9c74f;margin-bottom:8px">🧁 Cake ready — Bond for +12% catch · Stalk/Lure for +' + S.huntCakeBonus + ' attempt' + (S.huntCakeBonus>1?'s':'') + '</div>' : ''}
+      ${(function(){
+        var TYPE_C = {flora:'#4ade80',aqua:'#38bdf8',ember:'#f97316',shadow:'#818cf8',celestial:'#e879f9'};
+        if (S.huntCakeBonus) {
+          return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:8px 10px;'
+            + 'background:rgba(249,199,79,0.08);border:1px solid rgba(249,199,79,0.22);border-radius:8px">'
+            + '<span style="font-size:18px;flex-shrink:0">🧁</span>'
+            + '<div><div style="font-size:10px;font-weight:600;color:#f9c74f;margin-bottom:1px">Cake ready</div>'
+            + '<div style="font-size:9px;color:var(--text-muted)">Bond: +12% catch &nbsp;·&nbsp; Stalk / Lure: +'
+            + S.huntCakeBonus + ' attempt' + (S.huntCakeBonus>1?'s':'') + '</div></div></div>';
+        }
+        if (!S.cakes.length) return '';
+        var matching = [], other = [];
+        S.cakes.forEach(function(k,i){
+          var ok = !k.type || k.type === c.type;
+          if (ok) {
+            matching.push('<button onclick="useCake('+i+')" '
+              + 'style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:7px 10px;'
+              + 'background:rgba(249,199,79,0.1);border:1px solid rgba(249,199,79,0.28);border-radius:8px;'
+              + 'color:#f9c74f;cursor:pointer;font-family:Inter,sans-serif;text-align:left">'
+              + '<div style="font-size:11px;font-weight:600">'
+              + k.emoji+' '+k.name+' <span style="font-weight:400;opacity:0.55">×'+(k.count||1)+'</span></div>'
+              + '<div style="font-size:9px;opacity:0.6">+'
+              + k.attempts+' attempt'+(k.attempts>1?'s':'')+' · Bond +12% catch</div>'
+              + '</button>');
+          } else {
+            var tc = TYPE_C[k.type]||'var(--text-muted)';
+            other.push('<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;'
+              + 'background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;opacity:0.45">'
+              + '<span style="font-size:14px">'+k.emoji+'</span>'
+              + '<div><div style="font-size:10px;color:var(--text-dim)">'+k.name+' ×'+(k.count||1)+'</div>'
+              + '<div style="font-size:9px;color:'+tc+'">'+k.type+' only</div></div></div>');
+          }
+        });
+        if (!matching.length && !other.length) return '';
+        return '<div style="margin-bottom:8px">'
+          + '<div style="font-size:9px;color:var(--text-muted);letter-spacing:1px;margin-bottom:5px">CAKE</div>'
+          + '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:flex-start">'
+          + matching.join('')+other.join('')+'</div></div>';
+      })()}
       ${S.encounter && S.encounter._firstHunt ? '<div class="first-hunt-note">Choose an approach. Stalk works best when the creature hasn\'t noticed you.</div>' : ''}
       <div class="approach-grid">
         ${(function(){
