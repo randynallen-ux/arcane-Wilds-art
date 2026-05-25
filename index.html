@@ -3495,6 +3495,93 @@ function releaseCreature(uid, fromVoid) {
 }
 
 
+function toggleVoidSelect(uid) {
+  if (!S._voidSelected) S._voidSelected = [];
+  var idx = S._voidSelected.indexOf(uid);
+  if (idx >= 0) S._voidSelected.splice(idx, 1);
+  else S._voidSelected.push(uid);
+  renderVoid();
+}
+
+function voidSelectAll() {
+  S._voidSelected = S.void_.map(function(c){ return c.uid; });
+  renderVoid();
+}
+
+function showBulkReleaseConfirm() {
+  var uids = S._voidSelected || [];
+  if (!uids.length) return;
+  var toRelease = S.void_.filter(function(c){ return uids.indexOf(c.uid) >= 0; });
+  var existing = document.getElementById('bulk-release-modal');
+  if (existing) existing.remove();
+
+  var rarityScore = {common:1,uncommon:2,rare:3,epic:4,legendary:5,mythic:6};
+  var bondedCount = toRelease.filter(function(c){ return c.bonded; }).length;
+  var compCount = 0;
+  toRelease.forEach(function(c){ compCount += getClassReleaseCount(); });
+
+  var byRarity = {};
+  toRelease.forEach(function(c){ byRarity[c.rarity] = (byRarity[c.rarity]||0)+1; });
+  var raritySummary = Object.keys(byRarity)
+    .sort(function(a,b){ return (rarityScore[b]||0)-(rarityScore[a]||0); })
+    .map(function(r){ var rc=RARITIES[r]; return byRarity[r]+'× '+(rc&&rc.label?rc.label:r); }).join(' · ');
+
+  var listHtml = toRelease.map(function(c){
+    var rc = RARITIES[c.rarity]||{};
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'
+      + creatureThumbHtml(c, 28)
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      + c.name + (c.bonded?' <span style="font-size:9px;color:#e879f9">🤝</span>':'') + '</div>'
+      + '<div style="font-size:10px;color:'+(rc.color||'var(--text-muted)')+'">'+((rc.label)||c.rarity)+' · '+c.type+'</div>'
+      + '</div></div>';
+  }).join('');
+
+  var el = document.createElement('div');
+  el.id = 'bulk-release-modal';
+  el.className = 'release-modal';
+  el.innerHTML = '<div class="release-card" style="max-height:80vh;display:flex;flex-direction:column">'
+    + '<div style="font-family:Cinzel,serif;font-size:14px;color:var(--text);margin-bottom:2px">Release '
+    + toRelease.length + ' Creature' + (toRelease.length!==1?'s':'') + '?</div>'
+    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:12px">' + raritySummary + '</div>'
+    + '<div style="flex:1;overflow-y:auto;max-height:40vh;margin-bottom:12px">' + listHtml + '</div>'
+    + '<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:8px;line-height:1.6">'
+    + '<span style="color:var(--text-muted)">Returns:</span> ' + compCount + ' component' + (compCount!==1?'s':'')
+    + (bondedCount ? ' &nbsp;·&nbsp; <span style="color:#e879f9">+' + bondedCount + ' essence</span> from bonded' : '')
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="document.getElementById(\'bulk-release-modal\').remove();bulkReleaseFromVoid(['+uids.join(',')+'])" '
+    + 'style="flex:1;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:10px;padding:10px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Release All</button>'
+    + '<button onclick="document.getElementById(\'bulk-release-modal\').remove()" '
+    + 'style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:10px;padding:10px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+    + '</div></div>';
+
+  el.addEventListener('click', function(e){ if (e.target===el) el.remove(); });
+  document.body.appendChild(el);
+}
+
+function bulkReleaseFromVoid(uids) {
+  var toRelease = S.void_.filter(function(c){ return uids.indexOf(c.uid)>=0; });
+  if (!toRelease.length) return;
+  var totalComps = 0;
+  toRelease.forEach(function(c){
+    var count = getClassReleaseCount();
+    totalComps += count;
+    for (var i=0; i<count; i++) S.components.push(makeComp(c.type, c.rarity));
+    if (c.bonded) earnEssence(1, 'bonded release');
+  });
+  var n = toRelease.length;
+  S.void_ = S.void_.filter(function(c){ return uids.indexOf(c.uid)<0; });
+  if (S.selectedVoidCreature && uids.indexOf(S.selectedVoidCreature.uid)>=0) S.selectedVoidCreature=null;
+  S._voidSelectMode = false;
+  S._voidSelected = [];
+  renderVoid();
+  renderPassiveStats();
+  if (S.tab==='craft') renderCraft();
+  toast('Released '+n+' creature'+(n!==1?'s':'')+'. Got '+totalComps+' component'+(totalComps!==1?'s':'')+' back.');
+  autoSave();
+}
+
 function useCake(idx) {
   if (!S.encounter) return;
   const k = S.cakes[idx];
@@ -8310,6 +8397,8 @@ function creatureCard(c, selectedKey, fromVoid) {
   const col = c.unique ? c.unique.color : rc.color;
   const open = (fromVoid ? S.selectedVoidCreature : S.selectedCreature)?.uid === c.uid;
   const captBiome = BIOMES.find(b => b.id === c.capturedIn);
+  const selectMode = fromVoid && !!S._voidSelectMode;
+  const isSelected = selectMode && (S._voidSelected || []).indexOf(c.uid) >= 0;
 
   // ── Stat block ──────────────────────────────────────────────────────
   const STAT_MAX = { hp:20, atk:15, def:15, spd:15, mana:15 };
@@ -8341,8 +8430,8 @@ function creatureCard(c, selectedKey, fromVoid) {
     ? `<span class="bond-badge">🤝 BONDED</span>` : '';
 
   return `
-    <div class="creature-card" style="--card-rarity-col:${rc.color||'rgba(180,160,255,0.15)'}${c.bonded?';border-left-color:#e879f9':''} ">
-      <div class="creature-card-header" data-uid="${c.uid}" data-fromvoid="${fromVoid?1:0}" data-open="${open?1:0}" onclick="toggleCreatureCard(this)">
+    <div class="creature-card" style="--card-rarity-col:${rc.color||'rgba(180,160,255,0.15)'}${c.bonded?';border-left-color:#e879f9':''}${isSelected?';border-color:#e879f9;background:rgba(232,121,249,0.06)':''} ">
+      <div class="creature-card-header" data-uid="${c.uid}" data-fromvoid="${fromVoid?1:0}" data-open="${open?1:0}" onclick="${selectMode?`toggleVoidSelect(${c.uid})`:'toggleCreatureCard(this)'}">
         <div style="width:44px;height:44px;flex-shrink:0;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 0 ${c.unique?'8px':'4px'} ${c.unique?c.unique.glow:rc.glow}88)${c.bonded?';filter:drop-shadow(0 0 8px #e879f966)':''};background:rgba(0,0,0,0.2)">${creatureImgHtml(c,26)}</div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
@@ -8359,8 +8448,9 @@ function creatureCard(c, selectedKey, fromVoid) {
             ${captBiome ? `<span style="font-size:9px;color:var(--text-muted)">${captBiome.emoji} ${captBiome.name}</span>` : ''}
           </div>
         </div>
+        ${selectMode ? `<div style="width:20px;height:20px;flex-shrink:0;border-radius:50%;border:2px solid ${isSelected?'#e879f9':'rgba(255,255,255,0.2)'};background:${isSelected?'rgba(232,121,249,0.2)':'rgba(255,255,255,0.04)'};display:flex;align-items:center;justify-content:center;font-size:11px;color:#e879f9">${isSelected?'✓':''}</div>` : ''}
       </div>
-      ${open ? `<div class="creature-card-body open">
+      ${open && !selectMode ? `<div class="creature-card-body open">
         <div class="creature-lore">${c.lore}</div>
         <div class="creature-desc">${c.desc}</div>
         ${(function(){ var mt=getCreatureMemoryText(c.id); return mt ? '<div class="attempt-history">'+mt+'</div>' : ''; })()}
@@ -8516,6 +8606,21 @@ function renderVoid() {
       + s.charAt(0).toUpperCase() + s.slice(1) + '</button>';
   }).join('');
 
+  var selectMode = !!S._voidSelectMode;
+  var selectedCount = selectMode ? (S._voidSelected || []).length : 0;
+  var selectCtrlHtml = selectMode
+    ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;align-items:center">'
+        + '<button class="void-sort-btn" onclick="voidSelectAll()">All</button>'
+        + '<button class="void-sort-btn" onclick="S._voidSelected=[];renderVoid()">Clear</button>'
+        + '<button class="void-sort-btn" onclick="S._voidSelectMode=false;S._voidSelected=[];renderVoid()">Done</button>'
+        + (selectedCount
+            ? '<button class="void-sort-btn" style="margin-left:auto;color:#f87171;border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.08)" onclick="showBulkReleaseConfirm()">Release ' + selectedCount + '</button>'
+            : '')
+        + '</div>'
+    : '<div style="margin-top:6px">'
+        + '<button class="void-sort-btn" onclick="S._voidSelectMode=true;S._voidSelected=[];renderVoid()">Select to release</button>'
+        + '</div>';
+
   // Stats
   var bondedCount  = S.void_.filter(function(c){ return c.bonded; }).length;
   var uniqueCount  = S.void_.filter(function(c){ return c.unique;  }).length;
@@ -8549,6 +8654,7 @@ function renderVoid() {
     + (getCreatureMemoryText(featured.id) ? '<div style="font-size:9px;color:var(--text-muted);font-style:italic;margin-top:2px">' + getCreatureMemoryText(featured.id) + '</div>' : '')
     + '</div></div>'
     + '<div class="void-sort-bar">' + sortBtns + '</div>'
+    + selectCtrlHtml
     + '</div>';
 
   // Render sorted list
