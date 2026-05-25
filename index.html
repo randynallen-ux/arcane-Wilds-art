@@ -8160,7 +8160,7 @@ function renderHunt() {
 
 
   // Roster slots
-  const slots = Array.from({length:ROSTER_MAX},(_,i) =>
+  const slots = Array.from({length:getRosterMax()},(_,i) =>
     `<div class="roster-slot ${i<S.roster.length?'filled':''}"></div>`).join('');
 
   // Encounter zone
@@ -8225,7 +8225,7 @@ function renderHunt() {
         ${(function(){
           var c2 = S.encounter;
           var curState = stateFromPatience(S.patiencePct||100, S.encounterState||'calm');
-          var full = S.roster.length>=ROSTER_MAX&&S.void_.length>=VOID_MAX;
+          var full = S.roster.length>=getRosterMax()&&S.void_.length>=getVoidMax();
           return Object.keys(APPROACH_DEFS).map(function(key){
             var a = APPROACH_DEFS[key];
             var avail = a.available() && !full;
@@ -8286,7 +8286,7 @@ function renderHunt() {
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:10px;color:var(--text-muted);letter-spacing:1px">ROSTER</span>
       <div class="roster-slots">${slots}</div>
-      <span style="font-size:10px;color:${S.roster.length>=ROSTER_MAX?'#f97316':'var(--text-muted)'}">${S.roster.length}/${ROSTER_MAX}</span>
+      <span style="font-size:10px;color:${S.roster.length>=getRosterMax()?'#f97316':'var(--text-muted)'}">${S.roster.length}/${getRosterMax()}</span>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <div style="flex:1;min-width:140px">
@@ -8368,7 +8368,7 @@ function creatureCard(c, selectedKey, fromVoid) {
         <div class="card-actions">
           <button class="btn" onclick="event.stopPropagation();openImageModal(${c.uid})" style="font-size:14px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px">🖼</button>
           ${fromVoid
-            ? `<button class="btn btn-void" onclick="event.stopPropagation();recallFromVoid(${c.uid})" ${S.roster.length>=ROSTER_MAX?'disabled':''} style="flex:1">Recall to Roster</button>
+            ? `<button class="btn btn-void" onclick="event.stopPropagation();recallFromVoid(${c.uid})" ${S.roster.length>=getRosterMax()?'disabled':''} style="flex:1">Recall to Roster</button>
                <button class="btn btn-danger" onclick="event.stopPropagation();confirmRelease(${c.uid},true)">Release</button>`
             : `<button class="btn btn-void" onclick="event.stopPropagation();sendToVoid(${c.uid})" ${S.void_.length>=VOID_MAX?'disabled':''} style="flex:1">Send to Void</button>
                <button class="btn btn-danger" onclick="event.stopPropagation();confirmRelease(${c.uid},false)">Release</button>`}
