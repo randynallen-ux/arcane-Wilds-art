@@ -8411,10 +8411,10 @@ function renderHunt() {
             + S.huntCakeBonus + ' attempt' + (S.huntCakeBonus>1?'s':'') + '</div></div></div>';
         }
         if (!S.cakes.length) return '';
-        var matching = [], other = [];
+        var matching = [];
+        var hasIncompatible = false;
         S.cakes.forEach(function(k,i){
-          var ok = !k.type || k.type === c.type;
-          if (ok) {
+          if (!k.type || k.type === c.type) {
             matching.push('<button onclick="useCake('+i+')" '
               + 'style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:7px 10px;'
               + 'background:rgba(249,199,79,0.1);border:1px solid rgba(249,199,79,0.28);border-radius:8px;'
@@ -8425,19 +8425,17 @@ function renderHunt() {
               + k.attempts+' attempt'+(k.attempts>1?'s':'')+' · Bond +12% catch</div>'
               + '</button>');
           } else {
-            var tc = TYPE_C[k.type]||'var(--text-muted)';
-            other.push('<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;'
-              + 'background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;opacity:0.45">'
-              + '<span style="font-size:14px">'+k.emoji+'</span>'
-              + '<div><div style="font-size:10px;color:var(--text-dim)">'+k.name+' ×'+(k.count||1)+'</div>'
-              + '<div style="font-size:9px;color:'+tc+'">'+k.type+' only</div></div></div>');
+            hasIncompatible = true;
           }
         });
-        if (!matching.length && !other.length) return '';
+        var noMatchNote = !matching.length && hasIncompatible
+          ? '<div style="font-size:10px;color:var(--text-muted);font-style:italic">No cakes work on this creature</div>'
+          : '';
+        if (!matching.length && !noMatchNote) return '';
         return '<div style="margin-bottom:8px">'
           + '<div style="font-size:9px;color:var(--text-muted);letter-spacing:1px;margin-bottom:5px">CAKE</div>'
-          + '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:flex-start">'
-          + matching.join('')+other.join('')+'</div></div>';
+          + (matching.length ? '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:flex-start">' + matching.join('') + '</div>' : noMatchNote)
+          + '</div>';
       })()}
       ${S.encounter && S.encounter._firstHunt ? '<div class="first-hunt-note">Choose an approach. Stalk works best when the creature hasn\'t noticed you.</div>' : ''}
       <div class="approach-grid">
