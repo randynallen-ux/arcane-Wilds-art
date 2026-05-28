@@ -473,8 +473,8 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .biome-banner{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(90deg,rgba(255,255,255,0.03) 0%,var(--bg2) 100%);border-radius:12px;border:1px solid var(--border);border-left:3px solid var(--biome-col,var(--border))}
 
 /* ── FIELD SIGNS ─────────────────────────────────────────── */
-.field-sign-card{animation:sign-fade-in .6s ease forwards}
-@keyframes sign-fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.field-sign-card{animation:sign-emerge .72s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes sign-emerge{0%{opacity:0;transform:translateY(12px) scale(0.97);filter:blur(3px)}55%{filter:blur(0)}100%{opacity:1;transform:translateY(0) scale(1)}}
 
 /* ── CREATURE STATES ─────────────────────────────────────── */
 
@@ -1736,22 +1736,36 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 }
 
 /* ── LETTER PANEL ENHANCEMENTS ───────────────────────────── */
-#letter-inner.speaker-maren    { background: #f0e8d0; border-top: 3px solid #60a5fa33; }
-#letter-inner.speaker-sable    { background: #ede8d5; border-top: 3px solid #f9731633; }
-#letter-inner.speaker-the-warden { background: #ece8f0; border-top: 3px solid #818cf833; }
-#letter-inner.speaker-lys      { background: #e8f0e8; border-top: 3px solid #4ade8033; }
-#letter-inner.speaker-the-keeper { background: #ede8f5; border-top: 3px solid #c084fc33; }
-#letter-inner.speaker-you      { background: #f5eed8; border-top: 3px solid #d4a84333; }
+#letter-inner.speaker-maren    { background: #f0e8d0; border-top: 4px solid #60a5fa66; }
+#letter-inner.speaker-sable    { background: #ede8d5; border-top: 4px solid #f9731666; }
+#letter-inner.speaker-the-warden { background: #ece8f0; border-top: 4px solid #818cf866; }
+#letter-inner.speaker-lys      { background: #e8f0e8; border-top: 4px solid #4ade8066; }
+#letter-inner.speaker-the-keeper { background: #ede8f5; border-top: 4px solid #c084fc66; }
+#letter-inner.speaker-you      { background: #f5eed8; border-top: 4px solid #d4a84366; }
+
 #letter-inner.speaker-maren  .letter-title { color: #1e3a5f; }
 #letter-inner.speaker-sable  .letter-title { color: #7c2d12; }
 #letter-inner.speaker-the-warden .letter-title { color: #312e81; }
 #letter-inner.speaker-lys    .letter-title { color: #14532d; }
 #letter-inner.speaker-the-keeper .letter-title { color: #4a044e; }
-#letter-inner.speaker-maren  .letter-seal { filter: drop-shadow(0 2px 6px #60a5fa55); }
-#letter-inner.speaker-sable  .letter-seal { filter: drop-shadow(0 2px 6px #f9731655); }
-#letter-inner.speaker-the-warden .letter-seal { filter: drop-shadow(0 2px 6px #818cf855); }
-#letter-inner.speaker-lys    .letter-seal { filter: drop-shadow(0 2px 6px #4ade8055); }
-#letter-inner.speaker-the-keeper .letter-seal { filter: drop-shadow(0 2px 6px #c084fc55); }
+
+#letter-inner.speaker-maren  .letter-act { color: #1a4070; }
+#letter-inner.speaker-sable  .letter-act { color: #7c2d12; }
+#letter-inner.speaker-the-warden .letter-act { color: #4338ca; }
+#letter-inner.speaker-lys    .letter-act { color: #166534; }
+#letter-inner.speaker-the-keeper .letter-act { color: #581c87; }
+
+#letter-inner.speaker-maren  .letter-speaker { color: #1e3a5f; font-style: normal; font-weight: 600; }
+#letter-inner.speaker-sable  .letter-speaker { color: #7c2d12; font-style: normal; font-weight: 600; }
+#letter-inner.speaker-the-warden .letter-speaker { color: #312e81; font-style: normal; font-weight: 600; }
+#letter-inner.speaker-lys    .letter-speaker { color: #14532d; font-style: normal; font-weight: 600; }
+#letter-inner.speaker-the-keeper .letter-speaker { color: #4a044e; font-style: normal; font-weight: 600; }
+
+#letter-inner.speaker-maren  .letter-seal { filter: drop-shadow(0 2px 8px #60a5fa66); }
+#letter-inner.speaker-sable  .letter-seal { filter: drop-shadow(0 2px 8px #f9731666); }
+#letter-inner.speaker-the-warden .letter-seal { filter: drop-shadow(0 2px 8px #818cf866); }
+#letter-inner.speaker-lys    .letter-seal { filter: drop-shadow(0 2px 8px #4ade8066); }
+#letter-inner.speaker-the-keeper .letter-seal { filter: drop-shadow(0 2px 8px #c084fc66); }
 .letter-body em { font-style: italic; color: #4a3010; }
 .letter-body strong { font-weight: 700; color: #2a1a05; }
 #letter-inner.speaker-you .letter-body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.9; }
@@ -1888,6 +1902,20 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   font-size: 10px; color: var(--text-muted); font-style: italic;
   font-family: 'Inter', sans-serif; text-align: center; padding: 4px 0;
 }
+/* Typewriter paragraph stagger */
+@keyframes para-fade-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+/* Legendary/mythic capture ceremony */
+#capture-ceremony{position:fixed;inset:0;z-index:549;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;background:rgba(0,0,0,0);pointer-events:none;transition:background .5s ease}
+#capture-ceremony.ceremony-active{background:rgba(0,0,0,0.82)}
+#capture-ceremony.ceremony-fading{background:rgba(0,0,0,0);transition:background .7s ease}
+#cc-inner{display:flex;flex-direction:column;align-items:center;opacity:0;transform:scale(0.88) translateY(20px);transition:opacity .5s ease,transform .55s cubic-bezier(.22,1,.36,1)}
+#capture-ceremony.ceremony-active #cc-inner{opacity:1;transform:scale(1) translateY(0)}
+#capture-ceremony.ceremony-fading #cc-inner{opacity:0;transform:scale(1.05) translateY(-12px);transition:opacity .55s ease,transform .55s ease}
+#cc-img{width:130px;height:130px;border-radius:22px;overflow:hidden;margin-bottom:18px;box-shadow:0 0 60px var(--cc-glow,#f59e0b),0 0 120px var(--cc-glow,#f59e0b);border:2px solid var(--cc-glow,#f59e0b)}
+#cc-img img{width:100%;height:100%;object-fit:cover}
+#cc-rarity{font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;margin-bottom:8px}
+#cc-name{font-family:'Cinzel',serif;font-size:26px;font-weight:700;text-shadow:0 0 40px var(--cc-glow,#f59e0b);margin-bottom:10px}
+#cc-captured-tag{font-size:9px;letter-spacing:3px;color:rgba(255,255,255,0.4);text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -2010,6 +2038,14 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   <div id="screen-bestiary" class="screen"></div>
   <div class="toast hidden" id="toast"></div>
   <!-- IMAGE URL MODAL -->
+  <div id="capture-ceremony">
+    <div id="cc-inner">
+      <div id="cc-img"></div>
+      <div id="cc-rarity"></div>
+      <div id="cc-name"></div>
+      <div id="cc-captured-tag">Documented</div>
+    </div>
+  </div>
   <div id="image-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:600;align-items:center;justify-content:center;padding:20px">
     <div style="background:var(--bg2);border:1px solid var(--border-bright);border-radius:16px;padding:20px;max-width:380px;width:100%" id="image-modal-content">
     </div>
@@ -3449,6 +3485,31 @@ function startHunt() {
   }, encounterDelay);
 }
 
+function showCaptureCeremony(c, onDone) {
+  var overlay = document.getElementById('capture-ceremony');
+  if (!overlay) { if (onDone) onDone(); return; }
+  var rc  = RARITIES[c.rarity];
+  var col = c.unique ? c.unique.color : rc.color;
+  var glow = c.unique ? c.unique.glow : rc.glow;
+  document.getElementById('cc-img').innerHTML = creatureImgHtml(c, 80);
+  var rarEl = document.getElementById('cc-rarity');
+  rarEl.textContent = rc.label.toUpperCase();
+  rarEl.style.color = col;
+  var nameEl = document.getElementById('cc-name');
+  nameEl.textContent = c.name;
+  nameEl.style.color = col;
+  overlay.style.setProperty('--cc-glow', glow || col);
+  overlay.classList.add('ceremony-active');
+  setTimeout(function() {
+    overlay.classList.remove('ceremony-active');
+    overlay.classList.add('ceremony-fading');
+    setTimeout(function() {
+      overlay.classList.remove('ceremony-fading');
+      if (onDone) onDone();
+    }, 700);
+  }, 2300);
+}
+
 function doCapture() {
   if (!S.encounter || !S.activeBiome) return;
   const chance = catchChance(S.encounter);
@@ -3496,6 +3557,10 @@ function doCapture() {
       if (_cap.unique) {
         S.pendingName = _cap.uid;
         showNameModal(_cap);
+      } else if (_cap.rarity === 'legendary' || _cap.rarity === 'mythic') {
+        showCaptureCeremony(_cap, function() {
+          toast(toastCapture(_cap.name, _rf, _cap.bonded) + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+        });
       } else if (_cap._firstHunt) {
         toast('✦ ' + _cap.name + ' — documented. The codex has its first entry.', 'capture');
         setTimeout(function(){
@@ -4999,6 +5064,11 @@ function doApproach() {
       if (_aCap.unique) {
         S.pendingName = _aCap.uid;
         showNameModal(_aCap);
+      } else if (_aCap.rarity === 'legendary' || _aCap.rarity === 'mythic') {
+        var _aBond = _aCap.bonded ? ' 🤝 bonded' : '';
+        showCaptureCeremony(_aCap, function() {
+          toast('✨ ' + _aCap.name + (_aRf ? ' → Void' : ' captured!') + _aBond + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+        });
       } else {
         var bondNote = _aCap.bonded ? ' 🤝 bonded' : '';
         toast('✨ ' + _aCap.name + (_aRf ? ' → Void' : ' captured!') + bondNote + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
@@ -7706,28 +7776,31 @@ function renderLetterMarkdown(text) {
 }
 
 function typewriterHTML(el, body, onDone) {
-  var rendered = renderLetterMarkdown(body);
-  var visibleLen = rendered.replace(/<[^>]+>/g, '').length;
-  el.innerHTML = rendered.replace(/\n/g, '<br>');
-  el.style.opacity = '0';
-  el.style.transition = 'none';
-  if (visibleLen < 80) {
-    el.style.opacity = '1';
+  var paras = body.split(/\n\n+/).filter(Boolean);
+  var totalLen = body.replace(/<[^>]+>/g, '').length;
+
+  el.innerHTML = '';
+  el.style.opacity = '1';
+
+  if (totalLen < 80 || paras.length <= 1) {
+    el.innerHTML = renderLetterMarkdown(body).replace(/\n/g, '<br>');
     if (onDone) onDone();
     return null;
   }
-  var startTime = Date.now();
-  var totalTime = Math.min(2800, visibleLen * 14);
-  el.style.opacity = '0';
-  var timer = setInterval(function() {
-    var pct = Math.min(1, (Date.now() - startTime) / totalTime);
-    el.style.opacity = String(Math.pow(pct, 0.35));
-    if (pct >= 1) {
-      clearInterval(timer);
-      el.style.opacity = '1';
-      if (onDone) onDone();
-    }
-  }, 25);
+
+  var delay = 0;
+  paras.forEach(function(p) {
+    var pLen = p.length;
+    var fadeDur = Math.min(900, Math.max(320, pLen * 11));
+    var div = document.createElement('p');
+    div.innerHTML = renderLetterMarkdown(p).replace(/\n/g, '<br>');
+    div.style.cssText = 'margin:0 0 1em;opacity:0;white-space:normal;'
+      + 'animation:para-fade-in ' + fadeDur + 'ms ease ' + delay + 'ms both';
+    el.appendChild(div);
+    delay += fadeDur + 200;
+  });
+
+  var timer = setTimeout(function() { if (onDone) onDone(); }, delay);
   return timer;
 }
 
@@ -8477,9 +8550,9 @@ function renderHunt() {
     if (S.fieldSign) {
       var TYPE_COLORS_FS = {flora:'#4ade80',aqua:'#38bdf8',ember:'#f97316',shadow:'#818cf8',celestial:'#e879f9'};
       var signCol = TYPE_COLORS_FS[S.fieldSign.type] || 'var(--text-dim)';
-      signHTML = `<div style="max-width:280px;margin:0 auto;padding:14px 16px;border-radius:14px;border:1px solid ${signCol}33;background:${signCol}0d;text-align:left">
-        <div style="font-size:9px;letter-spacing:2px;color:${signCol};opacity:0.7;margin-bottom:8px">${S.fieldSign._culmination ? 'THE NETWORK' : S.fieldSign.creatureVoice ? 'RECEIVED' : 'FIELD SIGN'}</div>
-        <div style="font-size:12px;color:var(--text-dim);font-style:italic;line-height:1.6">${S.fieldSign.text}</div>
+      signHTML = `<div class="field-sign-card" style="max-width:290px;margin:0 auto;padding:16px 18px;border-radius:16px;border:1px solid ${signCol}44;background:${signCol}0e;text-align:left;box-shadow:0 4px 28px ${signCol}18">
+        <div style="font-size:9px;letter-spacing:2.5px;color:${signCol};margin-bottom:10px;font-weight:600">${S.fieldSign._culmination ? 'THE NETWORK' : S.fieldSign.creatureVoice ? 'RECEIVED' : 'FIELD SIGN'}</div>
+        <div style="font-size:13px;color:var(--text-dim);font-style:italic;line-height:1.65">${S.fieldSign.text}</div>
         ${S.fieldSign.creatureVoice ? `<div style="font-size:10px;color:var(--text-dim);margin-top:6px;padding-top:6px;border-top:1px solid ${signCol}22;font-style:normal;letter-spacing:0.3px">${S.fieldSign.creatureVoice}</div>` : ''}
         ${(S.fieldSign.rarityHint || hasKeenEye()) ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid ${signCol}22;font-style:italic">${S.fieldSign.rarityHint || ('Keen Eye: ' + (S.encounter ? S.encounter.rarity : (S.pendingEncounter ? S.pendingEncounter.rarity : 'unknown')))}</div>` : ''}}
         ${S.fieldSign.uniqueHint ? `<div style="font-size:10px;color:var(--gold);margin-top:6px;font-style:italic">${S.fieldSign.uniqueHint}</div>` : ''}
@@ -11453,11 +11526,22 @@ function _showNextLetter() {
 function dismissLetter() {
   // First tap on bg: skip to end of typing
   if (_letterTyping) {
-    clearInterval(_letterTyping);
+    clearTimeout(_letterTyping); clearInterval(_letterTyping);
     _letterTyping = null;
     var id = _letterQueue[0];
-    var e  = id ? STORY_ENTRIES[id] : null;
-    if (e) document.getElementById('letter-body').textContent = e.body;
+    var e = null;
+    if (id) e = (id.indexOf('__tut__') === 0) ? TUTORIAL_ENTRIES[id.replace('__tut__','')] : STORY_ENTRIES[id];
+    if (e) {
+      var bodyEl = document.getElementById('letter-body');
+      bodyEl.innerHTML = '';
+      var processed = processStoryBody ? processStoryBody(e.body) : e.body;
+      processed.split(/\n\n+/).filter(Boolean).forEach(function(p) {
+        var pEl = document.createElement('p');
+        pEl.innerHTML = renderLetterMarkdown(p).replace(/\n/g, '<br>');
+        pEl.style.cssText = 'margin:0 0 1em;white-space:normal';
+        bodyEl.appendChild(pEl);
+      });
+    }
     _letterDone = true;
     document.getElementById('letter-continue').style.display = 'block';
     return;
