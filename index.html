@@ -11205,13 +11205,13 @@ function checkStoryTriggers() {
 
   // Act 1
   if (!has('intro') && total >= 8) queue('intro');
-  if (!has('maren_letter') && total >= 12) queue('maren_letter');
   if (!has('warden_first') && total >= 5) queue('warden_first');
-  if (!has('act1_choice') && total >= 8 && has('warden_first')) queue('act1_choice');
+  if (!has('maren_letter') && total >= 12 && has('intro')) queue('maren_letter');
+  if (!has('act1_choice') && total >= 15 && has('maren_letter') && has('warden_first')) queue('act1_choice');
 
   // Act 2
   if (!has('shadow_marches_entry') && visited.indexOf('shadow_marches') >= 0 && has('act1_choice')) queue('shadow_marches_entry');
-  if (!has('sable_introduction') && rarities.indexOf('epic') >= 0) queue('sable_introduction');
+  if (!has('sable_introduction') && rarities.indexOf('epic') >= 0 && has('act1_choice')) queue('sable_introduction');
   if (!has('act2_choice') && total >= 28 && has('sable_introduction') && has('shadow_marches_entry')) queue('act2_choice');
 
   // Act 3
@@ -11219,7 +11219,7 @@ function checkStoryTriggers() {
   // Perception arc: warden_on_perception mid Act 3
   if (!has('warden_on_perception') && has('hollow_throne_entry') && total >= 38) queue('warden_on_perception');
   if (!has('maren_missing') && rarities.indexOf('legendary') >= 0 && has('hollow_throne_entry')) queue('maren_missing');
-  if (!has('act3_choice') && has('maren_missing')) queue('act3_choice');
+  if (!has('act3_choice') && has('maren_missing') && total >= 40) queue('act3_choice');
 
   // Act 4
   if (!has('veil_entry') && visited.indexOf('veil_crossing') >= 0 && has('act3_choice')) queue('veil_entry');
@@ -11258,7 +11258,7 @@ function checkStoryTriggers() {
   // Bond entry — triggers once after first successful bond
   if (!has('first_bond') && (S.roster.concat(S.void_)).some(function(c){ return c.bonded; })) queue('first_bond');
 
-  // Maren mastery reaction — triggers after 3 biomes mastered
+  // Maren mastery reaction — gated behind Act 1 so it never fires during early story
   if (!has('first_mythic') && (S.lifetime.rarities||[]).indexOf('mythic') >= 0 && total >= 40) queue('first_mythic');
   // Perception arc: the_change after Marches, ~22 captures
   if (!has('the_change') && total >= 22 && has('shadow_marches_entry')) queue('the_change');
@@ -11267,11 +11267,12 @@ function checkStoryTriggers() {
   // Perception arc: first_perception_bond after first actual bond
   if (!has('first_perception_bond') && has('first_bond') && has('maren_notices')) queue('first_perception_bond');
 
-  if (!has('maren_on_mastery') && BIOMES.filter(function(b){ return biomeMasteryTier(b.id) >= 3; }).length >= 3) queue('maren_on_mastery');
+  if (!has('maren_on_mastery') && has('act1_choice') && BIOMES.filter(function(b){ return biomeMasteryTier(b.id) >= 3; }).length >= 3) queue('maren_on_mastery');
 
   // Act 6
   var act5done = st.choices.some(function(c){ return c.indexOf('act5_')===0; });
-  if (!has('allshaper_first') && total >= 72 && has('lys_first_contact')) queue('allshaper_first');
+  // allshaper_first: first contact with the Allshaper — needs Act 5 well underway
+  if (!has('allshaper_first') && has('keepers_purpose') && total >= 80) queue('allshaper_first');
   if (!has('convergence_approach') && act5done && total >= 90) queue('convergence_approach');
   if (!has('lys_final_letter') && has('convergence_approach') && total >= 95) queue('lys_final_letter');
   if (!has('act6_choice') && has('lys_final_letter') && total >= 100) queue('act6_choice');
