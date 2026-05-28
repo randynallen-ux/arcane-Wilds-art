@@ -151,9 +151,9 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .atlas-border{position:absolute;inset:0;border-radius:14px;pointer-events:none}
 .atlas-page{background:rgba(13,10,5,0.92);border:1px solid #3a2e18;border-radius:12px;padding:14px;position:relative;overflow:hidden}
 .atlas-section-head{font-family:'Cinzel',serif;font-size:9px;letter-spacing:4px;color:#5a4a2a;padding:6px 0 4px;border-bottom:1px solid #3a2e18;margin-bottom:8px}
-.atlas-entry{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(90,74,42,0.18);cursor:pointer;transition:background .15s;border-radius:6px}
+.atlas-entry{display:flex;gap:10px;padding:9px 0 9px 10px;border-bottom:1px solid rgba(90,74,42,0.18);cursor:pointer;transition:background .15s;border-radius:6px;border-left:2px solid var(--biome-col,transparent)}
 .atlas-entry:last-child{border-bottom:none}
-.atlas-entry:hover:not(.locked){background:rgba(201,168,76,0.05)}
+.atlas-entry:hover:not(.locked){background:var(--biome-col-bg,rgba(201,168,76,0.05))}
 .atlas-entry.locked{opacity:.38;cursor:default}
 .atlas-entry-num{font-family:'Cinzel',serif;font-size:10px;color:#5a4a2a;width:16px;flex-shrink:0;padding-top:2px}
 .atlas-entry-emoji{font-size:18px;flex-shrink:0;width:26px;text-align:center}
@@ -931,15 +931,17 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 /* Recipe card */
 .recipe-card {
   border-radius: 14px; padding: 14px 16px;
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
-  margin-bottom: 8px; transition: border-color .2s, box-shadow .2s;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 8px; transition: border-color .2s, box-shadow .2s, background .2s;
 }
 .recipe-card.can-craft {
-  border-color: rgba(212,168,67,0.2);
+  border-color: rgba(212,168,67,0.28);
+  background: rgba(212,168,67,0.04);
 }
 .recipe-card.can-craft:hover {
-  border-color: rgba(212,168,67,0.4);
-  box-shadow: 0 4px 20px rgba(212,168,67,0.08);
+  border-color: rgba(212,168,67,0.5);
+  box-shadow: 0 2px 20px rgba(212,168,67,0.1), 0 0 0 1px rgba(212,168,67,0.14);
+  background: rgba(212,168,67,0.07);
 }
 .recipe-card-header {
   display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
@@ -964,6 +966,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   color: var(--text-dim);
 }
 .recipe-mat-chip.have { color: var(--text-dim); border-color: rgba(255,255,255,0.12); }
+.recipe-mat-chip:not(.have) { opacity: 0.42; }
 .recipe-card-footer {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
@@ -984,7 +987,8 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   border-color: rgba(212,168,67,0.5);
 }
 .recipe-craft-btn:disabled {
-  opacity: 0.35; cursor: not-allowed;
+  opacity: 0.28; cursor: not-allowed;
+  background: transparent; border-color: rgba(255,255,255,0.08); color: var(--text-muted);
 }
 
 /* Craft result reveal */
@@ -1392,14 +1396,22 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 
 /* Bestiary entry expanded */
 .bestiary-entry {
-  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
-  cursor: pointer;
+  padding: 10px 0 10px 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  cursor: pointer; position: relative; isolation: isolate;
+  border-left: 2px solid var(--entry-rarity-col, transparent);
+  border-radius: 4px; margin-bottom: 1px; transition: background .15s;
 }
+.bestiary-entry::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(90deg, var(--entry-rarity-col, transparent) 0%, transparent 55%);
+  opacity: .045; border-radius: inherit; pointer-events: none;
+}
+.bestiary-entry:hover::before { opacity: .08; transition: opacity .15s; }
 .bestiary-entry-header {
   display: flex; align-items: center; gap: 10px;
 }
 .bestiary-entry-body {
-  display: none; padding: 10px 0 4px 32px;
+  display: none; padding: 10px 0 4px 36px;
 }
 .bestiary-entry-body.open { display: block; }
 .bestiary-biome-tag {
@@ -3957,7 +3969,7 @@ function renderBestiary() {
         }).join('');
 
         var header = '<div class="bestiary-entry-header" onclick="toggleBestiaryEntry(\'' + entryId + '\')">'
-          + (known ? creatureThumbHtml(c, 32) : '<span style="font-size:18px;filter:grayscale(1);opacity:0.25">' + c.emoji + '</span>')
+          + (known ? creatureThumbHtml(c, 32) : '<span style="filter:brightness(0) opacity(0.18)">' + creatureThumbHtml(c, 32) + '</span>')
           + '<div style="flex:1">'
           + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
           + '<span style="font-size:12px;font-weight:600;color:' + (known?rc.color:'var(--text-muted)') + '">' + (known?c.name:'???') + '</span>'
@@ -3977,7 +3989,7 @@ function renderBestiary() {
           + (mem ? '<div style="font-size:9px;color:var(--text-muted);font-style:italic;font-family:Inter,sans-serif">' + mem + '</div>' : '')
           + '</div>' : '';
 
-        return '<div class="bestiary-entry">' + header + body + '</div>';
+        return '<div class="bestiary-entry" style="--entry-rarity-col:' + rc.color + '">' + header + body + '</div>';
       }).join('');
     }).join('');
 
@@ -8283,7 +8295,7 @@ function renderHunt() {
         const tierCol  = mTier>=3?'#e879f9':mTier>=2?'#60a5fa':'#c9a84c';
         const captures = (S.biomeCaptures&&S.biomeCaptures[b.id])||0;
         return `<div class="atlas-entry${unlocked?'':' locked'}" data-biome-id="${b.id}"
-            data-unlocked="${unlocked?1:0}" onclick="huntAtlasClick(this)">
+            data-unlocked="${unlocked?1:0}" onclick="huntAtlasClick(this)"${unlocked?` style="--biome-col:${b.color};--biome-col-bg:${b.color}0d"`:''} >
           <div class="atlas-entry-emoji" style="font-size:22px">${unlocked?b.emoji:'?'}</div>
           <div class="atlas-entry-body">
             <div class="atlas-entry-name" style="color:${unlocked?b.color:'var(--text-muted)'}">
