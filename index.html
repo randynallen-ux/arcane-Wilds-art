@@ -245,11 +245,12 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 #letter-panel.open #letter-inner{
   transform:translateY(0);
 }
-/* Fold lines */
+/* Fold lines — local attachment so lines scroll with content */
 #letter-inner::before{
   content:'';
   position:absolute;
-  top:0;left:0;right:0;bottom:0;
+  top:0;left:0;right:0;
+  height:10000px;
   background:
     repeating-linear-gradient(
       0deg,
@@ -11530,6 +11531,7 @@ function _showNextLetter() {
   // Open panel
   _letterDone = false;
   var panel = document.getElementById('letter-panel');
+  document.getElementById('letter-inner').scrollTop = 0;
   panel.classList.add('open');
   sfxLetterOpen();
   // Narration fires when typewriter finishes (user can also tap 🎙)
