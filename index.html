@@ -3429,6 +3429,10 @@ function startHunt() {
     setTimeout(function(){ playCreatureEmergence(c); }, 40);
     setTimeout(function(){ updateHuntZoneType(c.type, c.unique ? c.unique.glow : null); }, 20);
     setTimeout(function(){ FX.encounter(c.type, !!S.encounter.unique, c.id === 'formless'); }, 80);
+    setTimeout(function(){
+      var hz = document.querySelector('.hunt-zone');
+      if (hz) hz.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 120);
     toast('A wild ' + RARITIES[c.rarity].label + ' ' + c.name + ' appeared!');
   }, encounterDelay);
 }
