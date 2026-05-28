@@ -3095,6 +3095,16 @@ function isBiomeUnlocked(b) {
   return false;
 }
 
+function storyKeyChar(storyKey) {
+  if (!storyKey) return null;
+  var k = storyKey.toLowerCase();
+  if (k.indexOf('maren')  !== -1) return { initial:'M', color:'#60a5fa', name:'Maren' };
+  if (k.indexOf('sable')  !== -1) return { initial:'S', color:'#f97316', name:'Sable' };
+  if (k.indexOf('warden') !== -1) return { initial:'W', color:'#818cf8', name:'The Warden' };
+  if (k.indexOf('lys')    !== -1) return { initial:'L', color:'#4ade80', name:'Lys' };
+  return null;
+}
+
 function stars(count, color) {
   return Array.from({length:5}, (_,i) => `<span style="color:${i<count?color:'#2a2040'};font-size:11px">★</span>`).join('');
 }
@@ -3388,6 +3398,7 @@ function selectBiome(b) {
   if (b) trackGoalProgress('visit_biomes', b.id);
   if (!isBiomeUnlocked(b)) return;
   S.activeBiome = b;
+  stopAtlasDrone();
   playBiomeMusic(b.id);
   if (!S.visited.includes(b.id)) { S.visited.push(b.id); checkStoryTriggers(); checkTutorialTriggers(); }
   S.newUnlocks = S.newUnlocks.filter(x => x.id !== b.id);
@@ -3474,6 +3485,7 @@ function startHunt() {
     stopHuntAnim();
     renderHunt();
     startPatienceTimer(c);
+    encounterAmbienceSwell();
     setTimeout(function(){ playCreatureEmergence(c); }, 40);
     setTimeout(function(){ updateHuntZoneType(c.type, c.unique ? c.unique.glow : null); }, 20);
     setTimeout(function(){ FX.encounter(c.type, !!S.encounter.unique, c.id === 'formless'); }, 80);
@@ -3550,6 +3562,7 @@ function doCapture() {
     checkUnlocks();
     autoSave();
     clearPatienceTimer(); S.encounter = null; S.fails = 0; S.captureResult = null;
+    encounterAmbienceSettle();
     renderPassiveStats();
     var _cap = captured, _rf = rosterFull;
     setTimeout(function(){
@@ -3592,6 +3605,7 @@ function doCapture() {
         toast(toastEscape(S.encounter.name, null), 'escape');
       }
       clearPatienceTimer(); S.encounter = null; S.fails = 0; S.captureResult = null; updateHuntZoneType(null);
+      encounterAmbienceSettle();
       setTimeout(renderHunt, 480);
     } else {
       if (_img2) _img2.classList.add('creature-resist');
@@ -3611,6 +3625,7 @@ function doFlee() {
   if (isFleeLocked()) { toast('You\'re entangled — wait a moment.'); return; }
   S.encounter = null; S.fails = 0; S.captureResult = null;
   clearFightbackState(); S.huntStreak = 0;
+  encounterAmbienceSettle();
   sfxFlee();
   toast('You fled.');
   renderHunt();
@@ -4861,6 +4876,7 @@ function startPatienceTimer(creature) {
         updateHuntZoneType(null);
         var name = S.encounter.name;
         S.encounter = null; S.fails = 0; S.captureResult = null;
+        encounterAmbienceSettle();
         renderHunt();
         toast(toastPatience(name));
       }
@@ -8345,6 +8361,7 @@ function renderMap() {
 function renderHunt() {
   const el = document.getElementById('screen-hunt');
   if (!S.activeBiome) {
+    startAtlasDrone();
     // No biome selected — show region atlas inline
     const _unlockBanners = S.newUnlocks.map(b =>
       `<div class="unlock-banner" data-biome-id="${b.id}" onclick="huntAtlasClick(this)"
@@ -8367,18 +8384,23 @@ function renderHunt() {
         const tierMark = mTier>=3?' ✦✦✦':mTier>=2?' ✦✦':mTier>=1?' ✦':'';
         const tierCol  = mTier>=3?'#e879f9':mTier>=2?'#60a5fa':'#c9a84c';
         const captures = (S.biomeCaptures&&S.biomeCaptures[b.id])||0;
+        const charSeal  = (unlocked && b.req && b.req.story) ? storyKeyChar(b.req.story) : null;
+        const neverVisited = unlocked && !S.visited.includes(b.id);
+        const emojiGlow = (unlocked && mTier >= 3) ? ` filter:drop-shadow(0 0 6px ${b.color}aa)` : '';
         return `<div class="atlas-entry${unlocked?'':' locked'}" data-biome-id="${b.id}"
             data-unlocked="${unlocked?1:0}" onclick="huntAtlasClick(this)"${unlocked?` style="--biome-col:${b.color};--biome-col-bg:${b.color}0d"`:''} >
-          <div class="atlas-entry-emoji" style="font-size:22px">${unlocked?b.emoji:'?'}</div>
+          <div class="atlas-entry-emoji" style="font-size:22px;${emojiGlow}">${unlocked?b.emoji:'?'}</div>
           <div class="atlas-entry-body">
             <div class="atlas-entry-name" style="color:${unlocked?b.color:'var(--text-muted)'}">
               ${unlocked?b.name:(b.hidden?'Unknown Territory':b.name)}
+              ${neverVisited?`<span style="font-size:8px;letter-spacing:1.5px;color:var(--text-muted);font-family:sans-serif;margin-left:6px;opacity:0.7">UNVISITED</span>`:''}
             </div>
             <div class="atlas-entry-tagline">
               ${unlocked?b.desc:(b.hidden?'Cartographers have yet to document this region.':'Complete more expeditions to reveal.')}
             </div>
             ${unlocked&&captures>0?`<span style="color:${tierCol};font-size:9px">${tierMark} ${captures} captured</span>`:''}
           </div>
+          ${charSeal?`<div style="width:22px;height:22px;border-radius:50%;background:${charSeal.color}22;border:1px solid ${charSeal.color}66;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${charSeal.color};flex-shrink:0" title="Unlocked via ${charSeal.name}">${charSeal.initial}</div>`:''}
           ${unlocked?`<div style="font-size:10px;color:var(--text-muted);flex-shrink:0;padding-left:4px">Hunt →</div>`:''}
         </div>`;
       }).join('');
@@ -11725,7 +11747,7 @@ function renderJournal(filter) {
     if (item.masteryEntry) {
       var me = MASTERY_ENTRIES && MASTERY_ENTRIES[item.biomeId];
       if (!me) return '';
-      return '<div style="border-bottom:1px solid var(--border);padding:16px 0">'
+      return '<div style="border-bottom:1px solid var(--border);padding:16px 0 16px 16px;border-left:3px solid #e879f9;background:#e879f908;margin-bottom:2px">'
         + '<div style="font-size:9px;letter-spacing:3px;color:#e879f9;margin-bottom:4px">✦✦✦ BIOME MASTERED</div>'
         + '<div style="font-family:Cinzel,serif;font-size:15px;color:var(--text);font-weight:600;margin-bottom:8px">' + me.title + '</div>'
         + '<div style="font-size:14px;color:var(--text-dim);line-height:1.85">' + me.body + '</div>'
@@ -11734,7 +11756,7 @@ function renderJournal(filter) {
     if (item.tutorial) {
       var te = TUTORIAL_ENTRIES[item.id];
       if (!te) return '';
-      return '<div style="border-bottom:1px solid var(--border);padding:16px 0">'
+      return '<div style="border-bottom:1px solid var(--border);padding:16px 0 16px 16px;border-left:3px solid var(--text-muted);background:rgba(255,255,255,0.02);margin-bottom:2px">'
         + '<div style="font-size:9px;letter-spacing:3px;color:var(--text-muted);margin-bottom:4px">🖊 FIELD GUIDE</div>'
         + '<div style="font-family:Cinzel,serif;font-size:15px;color:var(--text-dim);font-weight:600;margin-bottom:8px">' + te.title + '</div>'
         + '<div style="font-size:14px;color:var(--text-dim);line-height:1.85;white-space:pre-line">' + te.body + '</div>'
@@ -11755,12 +11777,17 @@ function renderJournal(filter) {
       : e.speaker === 'Lys' ? '#4ade80'
       : e.speaker === 'The Keeper' ? '#c084fc'
       : 'var(--text-muted)';
-    var speakerLine = e.speaker ? '<div style="font-size:10px;letter-spacing:2px;margin-bottom:10px;color:' + tagCol + '">— ' + e.speaker.toUpperCase() + '</div>' : '';
+    var tagColHex = tagCol.startsWith('#') ? tagCol : null;
+    var borderCol = tagColHex ? tagColHex : '#888';
+    var bgTint = tagColHex ? tagColHex + '09' : 'rgba(255,255,255,0.015)';
+    var speakerLine = e.speaker
+      ? '<div style="font-size:11px;letter-spacing:2.5px;margin-bottom:12px;color:' + tagCol + ';font-weight:600">— ' + e.speaker.toUpperCase() + '</div>'
+      : '';
     var unlockLine = e.unlocks ? (function(){
       var b2 = BIOMES.find(function(b){ return b.req && b.req.story === e.unlocks; });
       return b2 ? '<div style="font-size:10px;color:var(--gold);margin-top:14px;padding:8px 10px;background:rgba(201,168,76,0.08);border-radius:8px;border:1px solid rgba(201,168,76,0.2)">🗺 ' + b2.name + ' unlocked</div>' : '';
     })() : '';
-    return '<div style="border-bottom:1px solid var(--border);padding:20px 0">'
+    return '<div style="border-bottom:1px solid var(--border);padding:20px 0 20px 16px;border-left:3px solid ' + borderCol + ';background:' + bgTint + ';margin-bottom:2px">'
       + '<div style="font-size:9px;letter-spacing:3px;margin-bottom:4px;color:' + tagCol + '">' + typeTag + (e.date ? ' · ' + e.date : '') + '</div>'
       + '<div style="font-family:Cinzel,serif;font-size:15px;color:var(--gold);font-weight:600;margin-bottom:14px">' + e.title + '</div>'
       + speakerLine
@@ -11792,6 +11819,8 @@ var _currentBiomeId = null;
 var _audioEnabled = true;
 var _musicVol = 0.45;
 var _sfxVol   = 0.7;
+var _atlasDroneNodes = [];
+var _encounterTensionNodes = [];
 
 function getAudioCtx() {
   if (!_audioCtx) {
@@ -12199,6 +12228,55 @@ var BIOME_MUSIC = {
   the_other_side:      musicCelestial,
 };
 
+// ── Atlas ambient drone (plays on biome-selection screen) ─────────────────
+function startAtlasDrone() {
+  if (!_audioEnabled || _atlasDroneNodes.length) return;
+  var ctx = getAudioCtx();
+  var g = ctx.createGain(); g.gain.value = 0; g.connect(_musicGain);
+  var o1 = ctx.createOscillator(); o1.type = 'sine'; o1.frequency.value = 55;
+  var o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = 82.5;
+  var lfoG = ctx.createGain(); lfoG.gain.value = 2.5;
+  var lfo  = ctx.createOscillator(); lfo.frequency.value = 0.06;
+  lfo.connect(lfoG); lfoG.connect(o1.frequency);
+  o1.connect(g); o2.connect(g); o1.start(); o2.start(); lfo.start();
+  g.gain.setTargetAtTime(0.07, ctx.currentTime, 3.0);
+  _atlasDroneNodes = [o1, o2, lfo, lfoG, g];
+}
+function stopAtlasDrone() {
+  if (!_atlasDroneNodes.length) return;
+  var nodes = _atlasDroneNodes; _atlasDroneNodes = [];
+  var ctx = getAudioCtx();
+  var g = nodes[4];
+  if (g) g.gain.setTargetAtTime(0, ctx.currentTime, 1.0);
+  setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){}); }, 3500);
+}
+
+// ── Encounter swell / settle ───────────────────────────────────────────────
+function encounterAmbienceSwell() {
+  if (!_audioEnabled || !_musicGain) return;
+  var ctx = getAudioCtx();
+  _musicGain.gain.cancelScheduledValues(ctx.currentTime);
+  _musicGain.gain.setTargetAtTime(_musicVol * 1.3, ctx.currentTime, 0.9);
+  var g = ctx.createGain(); g.gain.value = 0; g.connect(_musicGain);
+  var o1 = ctx.createOscillator(); o1.type = 'sine'; o1.frequency.value = 49;
+  var o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = 51.2;
+  o1.connect(g); o2.connect(g); o1.start(); o2.start();
+  g.gain.setTargetAtTime(0.05, ctx.currentTime, 1.4);
+  _encounterTensionNodes = [o1, o2, g];
+}
+function encounterAmbienceSettle() {
+  if (!_musicGain) return;
+  var ctx = getAudioCtx();
+  _musicGain.gain.cancelScheduledValues(ctx.currentTime);
+  _musicGain.gain.setTargetAtTime(_musicVol, ctx.currentTime, 2.0);
+  var nodes = _encounterTensionNodes; _encounterTensionNodes = [];
+  if (nodes.length) {
+    var g = nodes[2];
+    if (g) g.gain.setTargetAtTime(0, ctx.currentTime, 1.0);
+    setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){}); }, 3500);
+  }
+}
+
 function playBiomeMusic(biomeId) {
   if (!_audioEnabled) return;
   var fn = BIOME_MUSIC[biomeId];
@@ -12212,6 +12290,8 @@ function playBiomeMusic(biomeId) {
 }
 
 function stopMusic(fade) {
+  stopAtlasDrone();
+  encounterAmbienceSettle();
   if (_currentTrack) {
     var t = _currentTrack;
     _currentTrack = null;
