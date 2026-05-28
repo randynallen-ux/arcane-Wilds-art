@@ -7968,7 +7968,7 @@ function setToggleBtn(id, on) {
 
 function menuToggleMusic() {
   _audioEnabled = !_audioEnabled;
-  if (!_audioEnabled) stopMusic(true);
+  if (!_audioEnabled) stopMusic(true, true);
   else if (S.activeBiome) playBiomeMusic(S.activeBiome.id);
   setToggleBtn('menu-music-btn', _audioEnabled);
 }
@@ -12242,13 +12242,15 @@ function startAtlasDrone() {
   g.gain.setTargetAtTime(0.07, ctx.currentTime, 3.0);
   _atlasDroneNodes = [o1, o2, lfo, lfoG, g];
 }
-function stopAtlasDrone() {
+function stopAtlasDrone(immediate) {
   if (!_atlasDroneNodes.length) return;
   var nodes = _atlasDroneNodes; _atlasDroneNodes = [];
   var ctx = getAudioCtx();
   var g = nodes[4];
-  if (g) g.gain.setTargetAtTime(0, ctx.currentTime, 1.0);
-  setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){} }); }, 3500);
+  var tc = immediate ? 0.05 : 1.0;
+  if (g) { g.gain.cancelScheduledValues(ctx.currentTime); g.gain.setTargetAtTime(0, ctx.currentTime, tc); }
+  var delay = immediate ? 400 : 3500;
+  setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){} }); }, delay);
 }
 
 // ── Encounter swell / settle ───────────────────────────────────────────────
@@ -12264,16 +12266,20 @@ function encounterAmbienceSwell() {
   g.gain.setTargetAtTime(0.05, ctx.currentTime, 1.4);
   _encounterTensionNodes = [o1, o2, g];
 }
-function encounterAmbienceSettle() {
+function encounterAmbienceSettle(immediate) {
   if (!_musicGain) return;
   var ctx = getAudioCtx();
-  _musicGain.gain.cancelScheduledValues(ctx.currentTime);
-  _musicGain.gain.setTargetAtTime(_musicVol, ctx.currentTime, 2.0);
+  if (!immediate) {
+    _musicGain.gain.cancelScheduledValues(ctx.currentTime);
+    _musicGain.gain.setTargetAtTime(_musicVol, ctx.currentTime, 2.0);
+  }
   var nodes = _encounterTensionNodes; _encounterTensionNodes = [];
   if (nodes.length) {
     var g = nodes[2];
-    if (g) g.gain.setTargetAtTime(0, ctx.currentTime, 1.0);
-    setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){} }); }, 3500);
+    var tc = immediate ? 0.05 : 1.0;
+    if (g) { g.gain.cancelScheduledValues(ctx.currentTime); g.gain.setTargetAtTime(0, ctx.currentTime, tc); }
+    var delay = immediate ? 400 : 3500;
+    setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){} }); }, delay);
   }
 }
 
@@ -12289,9 +12295,9 @@ function playBiomeMusic(biomeId) {
   _currentTrack = { stop: stop };
 }
 
-function stopMusic(fade) {
-  stopAtlasDrone();
-  encounterAmbienceSettle();
+function stopMusic(fade, immediate) {
+  stopAtlasDrone(immediate);
+  encounterAmbienceSettle(immediate);
   if (_currentTrack) {
     var t = _currentTrack;
     _currentTrack = null;
@@ -12490,7 +12496,7 @@ function sfxUnique() {
 function toggleAudio() {
   _audioEnabled = !_audioEnabled;
   if (!_audioEnabled) {
-    stopMusic(true);
+    stopMusic(true, true);
   } else {
     if (S.activeBiome) playBiomeMusic(S.activeBiome.id);
   setTimeout(checkTutorialTriggers, 800);
