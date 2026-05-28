@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>What the Wilds Keep · Creature Codex</title>
@@ -2108,6 +2109,14 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         </div>
       </div>
 
+      <!-- Cloud Save -->
+      <div style="margin-bottom:20px">
+        <div style="font-size:9px;letter-spacing:3px;color:var(--text-muted);margin-bottom:12px">CLOUD ACCOUNT</div>
+        <div id="menu-cloud-status" style="font-size:11px;color:var(--text-muted);margin-bottom:10px;font-style:italic">Not signed in — saves are local only.</div>
+        <button id="menu-cloud-btn" onclick="closeMenu();showCloudAuthModal()"
+          style="width:100%;padding:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;cursor:pointer">☁ SIGN IN TO SYNC</button>
+      </div>
+
       <!-- Actions -->
       <div style="display:flex;flex-direction:column;gap:10px">
         <button onclick="closeMenu();showSaveModal()" style="width:100%;padding:13px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);border-radius:12px;color:var(--gold);font-family:Cinzel,serif;font-size:12px;letter-spacing:2px;cursor:pointer">💾 SAVE / LOAD</button>
@@ -2158,6 +2167,47 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
     </div>
   </div>
   </div><!-- /game-ui -->
+
+  <!-- CLOUD AUTH MODAL -->
+  <div id="cloud-auth-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:900;align-items:flex-end;justify-content:center" onclick="if(event.target===this)hideCloudAuthModal()">
+    <div style="background:var(--bg2);border:1px solid var(--border-bright);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:28px 24px 40px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-family:Cinzel,serif;font-size:14px;letter-spacing:3px;color:var(--gold)" id="cloud-modal-title">CLOUD ACCOUNT</div>
+        <button onclick="hideCloudAuthModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:20px" id="cloud-modal-sub">Sign in to sync your save across devices.</div>
+
+      <!-- Tab bar -->
+      <div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden" id="cloud-tab-bar">
+        <button id="cloud-tab-signin" onclick="switchCloudTab('signin')" style="flex:1;padding:9px;font-size:11px;font-family:Raleway,sans-serif;letter-spacing:1px;border:none;cursor:pointer;background:var(--gold);color:#07050f;font-weight:700">SIGN IN</button>
+        <button id="cloud-tab-signup" onclick="switchCloudTab('signup')" style="flex:1;padding:9px;font-size:11px;font-family:Raleway,sans-serif;letter-spacing:1px;border:none;cursor:pointer;background:rgba(255,255,255,0.04);color:var(--text-muted)">CREATE ACCOUNT</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px" id="cloud-form-fields">
+        <input id="cloud-email" type="email" placeholder="Email address" autocomplete="email"
+          style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:13px;font-family:Raleway,sans-serif;outline:none;width:100%;box-sizing:border-box"/>
+        <input id="cloud-password" type="password" placeholder="Password" autocomplete="current-password"
+          style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:13px;font-family:Raleway,sans-serif;outline:none;width:100%;box-sizing:border-box"/>
+        <div id="cloud-auth-error" style="font-size:11px;color:#f87171;display:none;padding:0 2px"></div>
+        <button id="cloud-auth-submit" onclick="submitCloudAuth()"
+          style="width:100%;padding:13px;background:var(--gold);border:none;border-radius:12px;color:#07050f;font-family:Cinzel,serif;font-size:12px;letter-spacing:2px;cursor:pointer;font-weight:700">SIGN IN</button>
+        <button onclick="hideCloudAuthModal()"
+          style="width:100%;padding:11px;background:none;border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-family:Raleway,sans-serif;font-size:11px;cursor:pointer">Play offline</button>
+      </div>
+
+      <!-- Signed-in state -->
+      <div id="cloud-signed-in-view" style="display:none;flex-direction:column;gap:12px">
+        <div style="padding:14px;background:rgba(201,168,76,0.07);border:1px solid rgba(201,168,76,0.2);border-radius:12px">
+          <div style="font-size:10px;color:var(--text-muted);letter-spacing:2px;margin-bottom:4px">SIGNED IN AS</div>
+          <div id="cloud-user-email" style="font-size:13px;color:var(--text)"></div>
+          <div id="cloud-sync-status" style="font-size:10px;color:var(--text-muted);margin-top:4px"></div>
+        </div>
+        <button onclick="manualCloudSync()" style="width:100%;padding:12px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);border-radius:12px;color:var(--gold);font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;cursor:pointer">☁ SYNC NOW</button>
+        <button onclick="signOut()" style="width:100%;padding:11px;background:none;border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-family:Raleway,sans-serif;font-size:11px;cursor:pointer">Sign out</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Save modal -->
   <div id="save-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:800;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)hideSaveModal()">
     <div style="background:var(--bg2);border:1px solid var(--border-bright);border-radius:18px;padding:22px 20px;max-width:440px;width:100%;max-height:88vh;overflow-y:auto">
@@ -12748,6 +12798,204 @@ const SAVE_SLOTS = ['save_slot_0','save_slot_1','save_slot_2'];
 const SAVE_BACKUP_KEY = 'what-the-wilds-keep-backup';
 var _saveLastAt = null;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CLOUD SAVE — Supabase integration
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _supabase = window.supabase
+  ? window.supabase.createClient(
+      'https://qeaqbwqtkebimntlrchb.supabase.co',
+      'sb_publishable_W6w3mX1ofu95knYzTpTwVQ_uKVwegdf'
+    )
+  : null;
+
+var _cloudUser     = null;   // current auth.User or null
+var _cloudSyncedAt = null;   // timestamp of last successful cloud save
+var _cloudTab      = 'signin';
+
+// ── Auth state listener ───────────────────────────────────────────────────
+if (_supabase) {
+  _supabase.auth.onAuthStateChange(function(event, session) {
+    _cloudUser = session ? session.user : null;
+    updateMenuCloudStatus();
+    if (event === 'SIGNED_IN') {
+      loadCloudSave();
+    }
+  });
+  // Restore existing session on page load
+  _supabase.auth.getSession().then(function(res) {
+    if (res.data && res.data.session) {
+      _cloudUser = res.data.session.user;
+      updateMenuCloudStatus();
+      loadCloudSave();
+    }
+  });
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────
+function showCloudAuthModal() {
+  var modal = document.getElementById('cloud-auth-modal');
+  modal.style.display = 'flex';
+  if (_cloudUser) {
+    showCloudSignedInView();
+  } else {
+    switchCloudTab('signin');
+    document.getElementById('cloud-form-fields').style.display = 'flex';
+    document.getElementById('cloud-signed-in-view').style.display = 'none';
+  }
+}
+function hideCloudAuthModal() {
+  document.getElementById('cloud-auth-modal').style.display = 'none';
+}
+function showCloudSignedInView() {
+  document.getElementById('cloud-modal-title').textContent = 'CLOUD ACCOUNT';
+  document.getElementById('cloud-modal-sub').textContent   = 'Your progress syncs automatically.';
+  document.getElementById('cloud-tab-bar').style.display   = 'none';
+  document.getElementById('cloud-form-fields').style.display = 'none';
+  document.getElementById('cloud-signed-in-view').style.display = 'flex';
+  document.getElementById('cloud-user-email').textContent  = _cloudUser ? _cloudUser.email : '';
+  var syncText = _cloudSyncedAt
+    ? 'Last synced ' + new Date(_cloudSyncedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+    : 'Not yet synced this session';
+  document.getElementById('cloud-sync-status').textContent = syncText;
+}
+function switchCloudTab(tab) {
+  _cloudTab = tab;
+  var isSI  = tab === 'signin';
+  document.getElementById('cloud-tab-signin').style.background  = isSI ? 'var(--gold)' : 'rgba(255,255,255,0.04)';
+  document.getElementById('cloud-tab-signin').style.color       = isSI ? '#07050f'     : 'var(--text-muted)';
+  document.getElementById('cloud-tab-signin').style.fontWeight  = isSI ? '700' : '400';
+  document.getElementById('cloud-tab-signup').style.background  = !isSI ? 'var(--gold)' : 'rgba(255,255,255,0.04)';
+  document.getElementById('cloud-tab-signup').style.color       = !isSI ? '#07050f'     : 'var(--text-muted)';
+  document.getElementById('cloud-tab-signup').style.fontWeight  = !isSI ? '700' : '400';
+  document.getElementById('cloud-auth-submit').textContent = isSI ? 'SIGN IN' : 'CREATE ACCOUNT';
+  document.getElementById('cloud-password').placeholder    = isSI ? 'Password' : 'Password (6+ characters)';
+  document.getElementById('cloud-password').autocomplete   = isSI ? 'current-password' : 'new-password';
+  document.getElementById('cloud-auth-error').style.display = 'none';
+}
+function updateMenuCloudStatus() {
+  var statusEl = document.getElementById('menu-cloud-status');
+  var btnEl    = document.getElementById('menu-cloud-btn');
+  if (!statusEl || !btnEl) return;
+  if (_cloudUser) {
+    statusEl.textContent = '✓ Signed in as ' + _cloudUser.email;
+    statusEl.style.color = '#4ade80';
+    btnEl.textContent    = '☁ CLOUD ACCOUNT';
+    btnEl.style.color    = 'var(--gold)';
+    btnEl.style.borderColor = 'rgba(201,168,76,0.3)';
+  } else {
+    statusEl.textContent = 'Not signed in — saves are local only.';
+    statusEl.style.color = 'var(--text-muted)';
+    btnEl.textContent    = '☁ SIGN IN TO SYNC';
+    btnEl.style.color    = 'var(--text-muted)';
+    btnEl.style.borderColor = 'var(--border)';
+  }
+}
+
+// ── Auth actions ──────────────────────────────────────────────────────────
+function submitCloudAuth() {
+  if (!_supabase) return;
+  var email    = (document.getElementById('cloud-email').value    || '').trim();
+  var password = (document.getElementById('cloud-password').value || '').trim();
+  var errEl    = document.getElementById('cloud-auth-error');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email and password required.'; errEl.style.display = 'block'; return; }
+  var btn = document.getElementById('cloud-auth-submit');
+  btn.textContent = '...';
+  btn.disabled = true;
+  var p = _cloudTab === 'signin'
+    ? _supabase.auth.signInWithPassword({ email: email, password: password })
+    : _supabase.auth.signUp({ email: email, password: password });
+  p.then(function(res) {
+    btn.disabled = false;
+    if (res.error) {
+      btn.textContent = _cloudTab === 'signin' ? 'SIGN IN' : 'CREATE ACCOUNT';
+      errEl.textContent = res.error.message;
+      errEl.style.display = 'block';
+    } else if (_cloudTab === 'signup' && res.data.user && !res.data.session) {
+      // Email confirmation required
+      btn.textContent = 'CREATE ACCOUNT';
+      errEl.style.color = '#4ade80';
+      errEl.textContent = 'Check your email for a confirmation link.';
+      errEl.style.display = 'block';
+    } else {
+      document.getElementById('cloud-tab-bar').style.display = 'none';
+      document.getElementById('cloud-form-fields').style.display = 'none';
+      showCloudSignedInView();
+    }
+  });
+}
+function signOut() {
+  if (!_supabase) return;
+  _supabase.auth.signOut().then(function() {
+    _cloudUser     = null;
+    _cloudSyncedAt = null;
+    updateMenuCloudStatus();
+    hideCloudAuthModal();
+    toast('Signed out. Saves continue locally.');
+  });
+}
+function manualCloudSync() {
+  saveToCloud(function(ok) {
+    toast(ok ? '☁ Synced to cloud.' : 'Sync failed — check connection.');
+    showCloudSignedInView();
+  });
+}
+
+// ── Cloud save / load ─────────────────────────────────────────────────────
+function saveToCloud(callback) {
+  if (!_supabase || !_cloudUser) { if (callback) callback(false); return; }
+  var data = buildSaveData();
+  data.savedAt = Date.now();
+  _supabase.from('saves')
+    .upsert({ user_id: _cloudUser.id, save_data: data, saved_at: data.savedAt }, { onConflict: 'user_id' })
+    .then(function(res) {
+      if (!res.error) {
+        _cloudSyncedAt = Date.now();
+        if (callback) callback(true);
+      } else {
+        if (callback) callback(false);
+      }
+    });
+}
+function loadCloudSave() {
+  if (!_supabase || !_cloudUser) return;
+  _supabase.from('saves').select('save_data, saved_at').eq('user_id', _cloudUser.id).maybeSingle()
+    .then(function(res) {
+      if (res.error || !res.data) {
+        // No cloud save yet — upload the local one
+        saveToCloud(null);
+        return;
+      }
+      var cloudData  = res.data.save_data;
+      var cloudTime  = res.data.saved_at || 0;
+      // Compare with local save
+      var localCode  = localStorage.getItem(SAVE_KEY);
+      var localTime  = 0;
+      try {
+        var localParsed = JSON.parse(decodeURIComponent(escape(atob(localCode || ''))));
+        localTime = localParsed.savedAt || 0;
+      } catch(e) {}
+      if (cloudTime > localTime) {
+        // Cloud is newer — apply it
+        if (applyData(cloudData)) {
+          // Also write to localStorage so offline works
+          try {
+            var code = btoa(unescape(encodeURIComponent(JSON.stringify(cloudData))));
+            localStorage.setItem(SAVE_KEY, code);
+          } catch(e) {}
+          renderHunt(); renderPassiveStats();
+          toast('☁ Cloud save loaded (' + (cloudData.lifetime ? cloudData.lifetime.total : '?') + ' captures).');
+        }
+      } else {
+        // Local is newer — push it up
+        saveToCloud(null);
+      }
+      _cloudSyncedAt = Date.now();
+      updateMenuCloudStatus();
+    });
+}
+
 function getSlotMeta(slotKey) {
   try {
     var code = localStorage.getItem(slotKey);
@@ -12887,6 +13135,7 @@ function autoSave() {
     }
   } catch(e) {}
   autoBackup();
+  saveToCloud(null); // fire-and-forget cloud sync if signed in
 }
 
 function showSplashContinue() {
