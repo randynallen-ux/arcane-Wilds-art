@@ -89,8 +89,10 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 .roster-slot.filled{background:var(--purple);border-color:rgba(124,58,237,0.6)}
 
 /* CREATURE CARD */
-.creature-card{background:linear-gradient(135deg,var(--bg3) 0%,var(--bg2) 100%);border:1px solid var(--border);border-left:2px solid var(--card-rarity-col,var(--border));border-radius:14px;margin-bottom:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.35);transition:box-shadow .2s,border-color .2s}
+.creature-card{position:relative;isolation:isolate;background:linear-gradient(135deg,var(--bg3) 0%,var(--bg2) 100%);border:1px solid var(--border);border-left:2px solid var(--card-rarity-col,var(--border));border-radius:14px;margin-bottom:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.35);transition:box-shadow .2s,border-color .2s}
+.creature-card::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(135deg,var(--card-rarity-col,transparent) 0%,transparent 55%);opacity:.055;pointer-events:none}
 .creature-card:hover{box-shadow:0 4px 20px rgba(0,0,0,0.5),0 0 0 1px var(--card-rarity-col,var(--border))}
+.creature-card:hover::before{opacity:.09;transition:opacity .2s}
 .creature-card-header{padding:11px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background .2s}
 .creature-card-header:hover{background:var(--surface-hover)}
 .creature-card-body{padding:12px 14px;border-top:1px solid var(--border);display:none;background:rgba(0,0,0,0.15)}
@@ -440,7 +442,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 @keyframes hunt-fog{0%{opacity:0.5;transform:scaleX(1)}100%{opacity:1;transform:scaleX(1.05)}}
 
 /* Hunt zone — type-colour theming via CSS var */
-.hunt-zone.typed{border-color:var(--encounter-col,var(--border));box-shadow:0 0 30px var(--encounter-glow,transparent),inset 0 0 40px rgba(0,0,0,0.3)}
+.hunt-zone.typed{border-color:var(--encounter-col,var(--border));box-shadow:0 0 40px var(--encounter-glow,transparent),inset 0 0 50px rgba(0,0,0,0.35)}
+.hunt-zone.typed::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 35%,var(--encounter-bg,transparent) 0%,transparent 62%);pointer-events:none;animation:hunt-fog 5s ease-in-out infinite alternate;z-index:0}
+.hunt-zone > *{position:relative;z-index:1}
 
 /* Creature image — rarity pulse glow */
 @keyframes glow-pulse{0%,100%{filter:drop-shadow(0 0 8px var(--glow-col,#ffffff44))}50%{filter:drop-shadow(0 0 18px var(--glow-col,#ffffff88))}}
@@ -4496,12 +4500,14 @@ function updateHuntZoneType(type, glowOverride) {
     hz.classList.remove('typed');
     hz.style.removeProperty('--encounter-col');
     hz.style.removeProperty('--encounter-glow');
+    hz.style.removeProperty('--encounter-bg');
   } else {
     var col = TYPE_COLORS[type] || '#a0a0ff';
     var glow = glowOverride || col;
     hz.classList.add('typed');
     hz.style.setProperty('--encounter-col', col + '55');
-    hz.style.setProperty('--encounter-glow', glow + '22');
+    hz.style.setProperty('--encounter-glow', glow + '35');
+    hz.style.setProperty('--encounter-bg', glow + '1a');
   }
 }
 
