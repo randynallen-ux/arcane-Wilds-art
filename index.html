@@ -12248,7 +12248,7 @@ function stopAtlasDrone() {
   var ctx = getAudioCtx();
   var g = nodes[4];
   if (g) g.gain.setTargetAtTime(0, ctx.currentTime, 1.0);
-  setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){}); }, 3500);
+  setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){} }); }, 3500);
 }
 
 // ── Encounter swell / settle ───────────────────────────────────────────────
@@ -12273,7 +12273,7 @@ function encounterAmbienceSettle() {
   if (nodes.length) {
     var g = nodes[2];
     if (g) g.gain.setTargetAtTime(0, ctx.currentTime, 1.0);
-    setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){}); }, 3500);
+    setTimeout(function(){ nodes.forEach(function(n){ try{if(n.stop)n.stop();}catch(e){} try{n.disconnect();}catch(e){} }); }, 3500);
   }
 }
 
