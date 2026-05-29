@@ -4403,13 +4403,32 @@ function speciesArtSrc(id) {
 }
 
 
+function _uniqueImgFilter(unique) {
+  if (!unique || !unique.glow || unique.prismatic) return '';
+  var hex = unique.glow.replace('#','');
+  var r = parseInt(hex.slice(0,2),16)/255;
+  var g = parseInt(hex.slice(2,4),16)/255;
+  var b = parseInt(hex.slice(4,6),16)/255;
+  var max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+  if (d < 0.15) return 'sepia(0.15) saturate(0.5) brightness(1.15)';
+  var h;
+  if (max === r) h = ((g - b) / d % 6);
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  var hue = Math.round((h / 6) * 360 + 360) % 360;
+  var rotate = (hue - 30 + 360) % 360;
+  return 'sepia(0.35) hue-rotate(' + rotate + 'deg) saturate(1.5) brightness(1.05)';
+}
+
 function creatureImgHtml(c, emojiSize) {
   var src = c.customImage || speciesArtSrc(c.id);
   if (src) {
+    var imgFilter = _uniqueImgFilter(c.unique);
+    var imgStyle = 'width:100%;height:100%;object-fit:cover' + (imgFilter ? ';filter:' + imgFilter : '');
     var errHandler = _devMode
       ? 'this.style.outline=\'2px solid #f97316\';this.title=\'Image failed to load\''
       : 'this.style.display=\'none\';var fb=this.nextSibling;if(fb)fb.style.display=\'block\'';
-    return '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover" '
+    return '<img src="' + src + '" style="' + imgStyle + '" '
       + 'onerror="' + errHandler + '">'
       + '<span style="display:none;font-size:' + emojiSize + 'px;line-height:1">' + c.emoji + '</span>';
   }
@@ -4421,9 +4440,11 @@ function creatureThumbHtml(c, sizePx, opts) {
   var sz = sizePx || 32;
   var r = (opts && opts.radius !== undefined) ? opts.radius : '4px';
   if (src) {
+    var imgFilter = _uniqueImgFilter(c.unique);
+    var imgStyle = 'width:100%;height:100%;object-fit:cover' + (imgFilter ? ';filter:' + imgFilter : '');
     return '<span style="display:inline-block;width:' + sz + 'px;height:' + sz + 'px;'
       + 'border-radius:' + r + ';overflow:hidden;vertical-align:middle;flex-shrink:0">'
-      + '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover" '
+      + '<img src="' + src + '" style="' + imgStyle + '" '
       + 'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'inline\'">'
       + '<span style="display:none;font-size:' + Math.round(sz * 0.6) + 'px;line-height:' + sz + 'px">' + c.emoji + '</span>'
       + '</span>';
