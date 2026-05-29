@@ -2060,10 +2060,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <div id="cc-captured-tag">Documented</div>
     </div>
   </div>
-  <div id="image-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:600;align-items:center;justify-content:center;padding:20px">
-    <div style="background:var(--bg2);border:1px solid var(--border-bright);border-radius:16px;padding:20px;max-width:380px;width:100%" id="image-modal-content">
-    </div>
-  </div>
   <!-- LETTER PANEL -->
   <div id="letter-panel" onclick="if(_letterTyping)dismissLetter()">
     <div id="letter-inner" onclick="event.stopPropagation()">
@@ -4402,21 +4398,8 @@ const SPECIES_ART = {
   "the_bastion": "https://qeaqbwqtkebimntlrchb.supabase.co/storage/v1/object/public/creature-art/the_bastion.png"
 };
 
-var _speciesArtCache = null;
-function _getSpeciesArtCache() {
-  if (!_speciesArtCache) {
-    try { _speciesArtCache = JSON.parse(localStorage.getItem('wtwk_species_art') || '{}'); }
-    catch(e) { _speciesArtCache = {}; }
-  }
-  return _speciesArtCache;
-}
-function invalidateSpeciesArtCache() { _speciesArtCache = null; }
-
 function speciesArtSrc(id) {
-  var val = SPECIES_ART[id];
-  if (!val) { var cache = _getSpeciesArtCache(); val = cache[id] || null; }
-  if (!val) return null;
-  return isInlineSvg(val) ? svgToDataUrl(val) : val;
+  return SPECIES_ART[id] || null;
 }
 
 
@@ -4438,13 +4421,11 @@ function _uniqueImgFilter(unique) {
 }
 
 function creatureImgHtml(c, emojiSize) {
-  var src = c.customImage || speciesArtSrc(c.id);
+  var src = speciesArtSrc(c.id);
   if (src) {
     var imgFilter = _uniqueImgFilter(c.unique);
     var imgStyle = 'width:100%;height:100%;object-fit:cover' + (imgFilter ? ';filter:' + imgFilter : '');
-    var errHandler = _devMode
-      ? 'this.style.outline=\'2px solid #f97316\';this.title=\'Image failed to load\''
-      : 'this.style.display=\'none\';var fb=this.nextSibling;if(fb)fb.style.display=\'block\'';
+    var errHandler = 'this.style.display=\'none\';var fb=this.nextSibling;if(fb)fb.style.display=\'block\'';
     return '<img src="' + src + '" style="' + imgStyle + '" '
       + 'onerror="' + errHandler + '">'
       + '<span style="display:none;font-size:' + emojiSize + 'px;line-height:1">' + c.emoji + '</span>';
@@ -4453,7 +4434,7 @@ function creatureImgHtml(c, emojiSize) {
 }
 
 function creatureThumbHtml(c, sizePx, opts) {
-  var src = c.customImage || speciesArtSrc(c.id);
+  var src = speciesArtSrc(c.id);
   var sz = sizePx || 32;
   var r = (opts && opts.radius !== undefined) ? opts.radius : '4px';
   if (src) {
@@ -4490,202 +4471,6 @@ function handleTitleTap() {
   } else {
     _titleTapTimer = setTimeout(function(){ _titleTaps = 0; }, 1200);
   }
-}
-
-var _devCreatureId = null;
-function applyDevImageFromModal() { applyDevImage(_devCreatureId); }
-function clearDevImageFromModal()  { clearDevImage(_devCreatureId); }
-
-function svgToDataUrl(svgText) {
-  var cleaned = svgText.trim();
-  if (!cleaned.startsWith('<svg')) return cleaned;
-  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(cleaned);
-}
-function isInlineSvg(val) {
-  return val && val.trim().startsWith('<svg');
-}
-function previewDevImage() {
-  var inp = document.getElementById('dev-img-input');
-  var val = inp ? inp.value.trim() : '';
-  if (!val) return;
-  var src = isInlineSvg(val) ? svgToDataUrl(val) : val;
-  var existing = document.getElementById('dev-preview-img');
-  if (existing) { existing.src = src; existing.style.display = 'block'; return; }
-  var img = document.createElement('img');
-  img.id = 'dev-preview-img';
-  img.src = src;
-  img.style.cssText = 'width:100%;border-radius:8px;margin-bottom:10px;max-height:180px;object-fit:contain;background:#08060e';
-  inp.parentNode.insertBefore(img, inp);
-}
-
-function openDevImageModal(creatureId) {
-  _devCreatureId = creatureId;
-  var c = CREATURES.find(function(x){ return x.id === creatureId; });
-  if (!c) return;
-  var devArt = {};
-  try { devArt = JSON.parse(localStorage.getItem('wtwk_species_art') || '{}'); } catch(e) {}
-  var current = SPECIES_ART[creatureId] || devArt[creatureId] || '';
-  var previewSrc = isInlineSvg(current) ? svgToDataUrl(current) : current;
-
-  var el = document.getElementById('image-modal-content');
-  el.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-    + '<div style="font-family:Cinzel,serif;font-size:13px;color:#f97316">🛠 ' + c.name + '</div>'
-    + '<button onclick="closeImageModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer">×</button>'
-    + '</div>'
-    + '<div style="font-size:10px;color:#f97316;margin-bottom:10px;padding:6px 10px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.2);border-radius:6px">Sets art for all ' + c.name + ' instances globally</div>'
-    + (previewSrc ? '<img id="dev-preview-img" src="' + previewSrc + '" style="width:100%;border-radius:8px;margin-bottom:10px;max-height:180px;object-fit:contain;background:#08060e"/>' : '<div id="dev-preview-img" style="display:none"></div>')
-    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Paste a URL or raw SVG code:</div>'
-    + '<textarea id="dev-img-input" rows="4" placeholder="https://... or SVG code" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(249,115,22,0.3);border-radius:8px;color:var(--text);font-family:monospace;font-size:11px;padding:9px 12px;outline:none;margin-bottom:6px;resize:vertical;box-sizing:border-box">' + (current || '') + '</textarea>'
-    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">Recraft SVG: download → open in text editor → select all → paste above</div>'
-    + '<div style="display:flex;gap:8px;margin-bottom:12px">'
-    + '<button onclick="previewDevImage()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px;font-family:Raleway,sans-serif;font-size:12px;cursor:pointer">Preview</button>'
-    + '<button onclick="applyDevImageFromModal()" style="flex:1;background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.35);color:#f97316;border-radius:10px;padding:10px;font-family:Cinzel,serif;font-size:12px;cursor:pointer">Apply</button>'
-    + (current ? '<button onclick="clearDevImageFromModal()" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:10px;font-size:12px;cursor:pointer">Clear</button>' : '')
-    + '</div>'
-    + '<div style="border-top:1px solid var(--border);padding-top:12px">'
-    + '<button onclick="exportSpeciesArt()" style="width:100%;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.2);color:#f97316;border-radius:8px;padding:8px;font-size:11px;cursor:pointer">📋 Export art map (all)</button>'
-    + '<button onclick="exportSpeciesArtBatch()" style="width:100%;margin-top:6px;background:rgba(249,115,22,0.04);border:1px solid rgba(249,115,22,0.15);color:#f97316;border-radius:8px;padding:8px;font-size:11px;cursor:pointer">📦 Export batch (5 at a time)</button>'
-    + '</div>';
-
-  document.getElementById('image-modal').style.display = 'flex';
-  setTimeout(function(){ var inp = document.getElementById('dev-img-input'); if(inp) inp.focus(); }, 80);
-}
-
-
-function applyDevImage(id) {
-  var inp = document.getElementById('dev-img-input');
-  var url = inp ? inp.value.trim() : '';
-  var devArt = {};
-  try { devArt = JSON.parse(localStorage.getItem('wtwk_species_art') || '{}'); } catch(e) {}
-  if (url) devArt[id] = url; else delete devArt[id];
-  localStorage.setItem('wtwk_species_art', JSON.stringify(devArt));
-  invalidateSpeciesArtCache();
-  closeImageModal();
-  // Re-render
-  if (S.tab === 'roster') renderRoster();
-  else if (S.tab === 'void') renderVoid();
-  else if (S.tab === 'bestiary') renderBestiary();
-  toast('🛠 Species art updated: ' + (CREATURES.find(function(c){return c.id===id;})||{name:id}).name);
-}
-
-function clearDevImage(id) {
-  var devArt = {};
-  try { devArt = JSON.parse(localStorage.getItem('wtwk_species_art') || '{}'); } catch(e) {}
-  delete devArt[id];
-  localStorage.setItem('wtwk_species_art', JSON.stringify(devArt));
-  invalidateSpeciesArtCache();
-  closeImageModal();
-  if (S.tab === 'roster') renderRoster();
-  else if (S.tab === 'void') renderVoid();
-  else if (S.tab === 'bestiary') renderBestiary();
-  toast('🛠 Species art cleared.');
-}
-
-function copyBatchExport() {
-  // Select the textarea content so user can copy with system menu
-  var ta = document.getElementById('export-json-ta');
-  if (!ta) { toast('Nothing to copy.'); return; }
-  ta.focus();
-  ta.select();
-  try { ta.setSelectionRange(0, ta.value.length); } catch(e) {}
-  // Try clipboard API — works in secure contexts
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(window._batchExportJson || ta.value)
-      .then(function(){ toast('Copied!'); })
-      .catch(function(){ toast('Text selected — use Copy from menu'); });
-  } else {
-    try {
-      var ok = document.execCommand('copy');
-      toast(ok ? 'Copied!' : 'Text selected — use Copy from menu');
-    } catch(e) {
-      toast('Text selected — use Copy from menu');
-    }
-  }
-}
-
-function copyDevExport() {
-  var t = document.getElementById('export-json-ta');
-  if (!t) return;
-  t.select();
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(t.value).then(function(){ toast('Copied!'); }).catch(function(){ document.execCommand('copy'); toast('Copied!'); });
-  } else {
-    document.execCommand('copy');
-    toast('Copied!');
-  }
-}
-
-
-function exportSpeciesArt() {
-  var devArt = {};
-  try { devArt = JSON.parse(localStorage.getItem('wtwk_species_art') || '{}'); } catch(e) {}
-  var merged = Object.assign({}, SPECIES_ART, devArt);
-  var count = Object.keys(merged).length;
-  if (!count) { toast('No species art set yet.'); return; }
-  var json = JSON.stringify(merged, null, 2);
-  // Show in a copyable modal
-  var el = document.getElementById('image-modal-content');
-  el.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-    + '<div style="font-family:Cinzel,serif;font-size:14px;color:#f97316">🛠 Species Art Export (' + count + ')</div>'
-    + '<button onclick="closeImageModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>'
-    + '</div>'
-    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">Send this JSON to your developer. They will embed it as the <code style="color:#f97316">SPECIES_ART</code> constant in the game file.</div>'
-    + '<textarea readonly style="width:100%;height:180px;background:rgba(0,0,0,0.4);border:1px solid rgba(249,115,22,0.3);border-radius:8px;color:#f97316;font-family:monospace;font-size:10px;padding:10px;resize:none;outline:none" id="export-json-ta">' + json.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>'
-    + '<button onclick="copyDevExport()" style="width:100%;margin-top:8px;background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.35);color:#f97316;border-radius:8px;padding:9px;font-family:Raleway,sans-serif;font-size:12px;cursor:pointer">Copy to clipboard</button>';
-  document.getElementById('image-modal').style.display = 'flex';
-}
-
-
-function exportSpeciesArtBatch() {
-  var devArt = {};
-  try { devArt = JSON.parse(localStorage.getItem('wtwk_species_art') || '{}'); } catch(e) {}
-  var merged = Object.assign({}, SPECIES_ART, devArt);
-  var keys = Object.keys(merged);
-  var count = keys.length;
-  if (!count) { toast('No species art set yet.'); return; }
-
-  // Build batches by byte budget (~200KB each) rather than fixed count
-  var BUDGET = 200 * 1024;
-  var batches = [];
-  var currentBatch = [], currentSize = 0;
-  keys.forEach(function(k) {
-    var size = (merged[k] || '').length;
-    if (currentBatch.length > 0 && currentSize + size > BUDGET) {
-      batches.push(currentBatch);
-      currentBatch = []; currentSize = 0;
-    }
-    currentBatch.push(k);
-    currentSize += size;
-  });
-  if (currentBatch.length) batches.push(currentBatch);
-
-  var totalBatches = batches.length;
-  var batchIndex = 0;
-  try { batchIndex = (JSON.parse(localStorage.getItem('wtwk_batch_cursor') || '0') || 0) % totalBatches; } catch(e) {}
-  var batchKeys = batches[batchIndex];
-  var batchObj = {};
-  batchKeys.forEach(function(k){ batchObj[k] = merged[k]; });
-  var json = JSON.stringify(batchObj, null, 2);
-  localStorage.setItem('wtwk_batch_cursor', JSON.stringify((batchIndex + 1) % totalBatches));
-
-  // Store raw JSON for copy (textarea escapes HTML entities which breaks clipboard)
-  window._batchExportJson = json;
-  var el = document.getElementById('image-modal-content');
-  el.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-    + '<div style="font-family:Cinzel,serif;font-size:13px;color:#f97316">📦 Batch ' + (batchIndex+1) + ' / ' + totalBatches + '</div>'
-    + '<button onclick="closeImageModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer">×</button>'
-    + '</div>'
-    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;line-height:1.5">Creatures: <span style="color:#f97316">' + batchKeys.join(', ') + '</span><br>Export all ' + totalBatches + ' batches, then send them together.</div>'
-    + '<div style="font-size:9px;color:var(--text-muted);margin-bottom:4px;opacity:0.6">Tap "Copy batch" to select all text, then use your system Copy option if needed.</div>'
-    + '<textarea readonly style="width:100%;height:160px;background:rgba(0,0,0,0.4);border:1px solid rgba(249,115,22,0.3);border-radius:8px;color:#f97316;font-family:monospace;font-size:10px;padding:10px;resize:none;outline:none" id="export-json-ta">' + json.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>'
-    + '<div style="display:flex;gap:6px;margin-top:8px">'
-    + '<button onclick="copyBatchExport()" style="flex:1;background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.35);color:#f97316;border-radius:8px;padding:9px;font-size:12px;cursor:pointer">Copy batch ' + (batchIndex+1) + '</button>'
-    + (totalBatches > 1 ? '<button onclick="closeImageModal();setTimeout(exportSpeciesArtBatch,50)" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:9px;font-size:12px;cursor:pointer">Next batch →</button>' : '')
-    + '</div>';
-  document.getElementById('image-modal').style.display = 'flex';
 }
 
 
@@ -8127,58 +7912,7 @@ function openFieldNoteFromBestiary(id) {
 }
 
 
-function closeImageModal() { document.getElementById('image-modal').style.display='none'; }
 
-function openImageModal(uid) {
-  var list = S.roster.concat(S.void_);
-  var c = list.find(function(x){ return x.uid == uid; });
-  if (!c) return;
-  // In dev mode, redirect to species art editor
-  if (_devMode) { openDevImageModal(c.id); return; }
-  var el = document.getElementById('image-modal-content');
-  var current = c.customImage || '';
-  el.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    + '<div style="font-family:Cinzel,serif;font-size:15px;color:var(--gold)">' + c.name + ' — Custom Art</div>'
-    + '<button onclick="closeImageModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>'
-    + '</div>'
-    + (current ? '<img src="' + current + '" style="width:100%;border-radius:10px;margin-bottom:12px;max-height:200px;object-fit:contain;background:#08060e" onerror="this.style.display=&quot;none&quot;"/>' : '')
-    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Paste a direct image URL (JPG, PNG, WebP, or GIF):</div>'
-    + '<input id="img-url-input" type="text" value="' + current + '" placeholder="https://example.com/image.png"'
-    + ' style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:Raleway,sans-serif;font-size:12px;padding:9px 12px;outline:none;margin-bottom:10px"/>'
-    + '<div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-bottom:14px">The image will display on the creature card and in the encounter zone. Use a square image for best results.</div>'
-    + '<div style="display:flex;gap:8px">'
-    + '<button onclick="applyCreatureImage(' + uid + ')" style="flex:1;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.35);color:var(--gold);border-radius:10px;padding:10px;font-family:Cinzel,serif;font-size:12px;cursor:pointer">Apply</button>'
-    + (current ? '<button onclick="clearCreatureImage(' + uid + ')" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:10px;font-family:Raleway,sans-serif;font-size:12px;cursor:pointer">Clear</button>' : '')
-    + '</div>';
-  document.getElementById('image-modal').style.display = 'flex';
-  setTimeout(function(){ var inp = document.getElementById('img-url-input'); if(inp) inp.focus(); }, 80);
-}
-
-function applyCreatureImage(uid) {
-  var inp = document.getElementById('img-url-input');
-  var url = inp ? inp.value.trim() : '';
-  var list = S.roster.concat(S.void_);
-  var c = list.find(function(x){ return x.uid == uid; });
-  if (!c) return;
-  if (url) { c.customImage = url; } else { delete c.customImage; }
-  document.getElementById('image-modal').style.display = 'none';
-  autoSave();
-  if (S.tab === 'roster') renderRoster();
-  else if (S.tab === 'void') renderVoid();
-  toast(url ? '🖼 Image applied to ' + c.name : 'Image cleared.');
-}
-
-function clearCreatureImage(uid) {
-  var list = S.roster.concat(S.void_);
-  var c = list.find(function(x){ return x.uid == uid; });
-  if (c) { delete c.customImage; }
-  document.getElementById('image-modal').style.display = 'none';
-  autoSave();
-  if (S.tab === 'roster') renderRoster();
-  else if (S.tab === 'void') renderVoid();
-  toast('Image cleared.');
-}
 function storyRelevant(biomeId) {
   var storyBiomes = ['shadow_marches','hollow_throne','veil_crossing','unmapped_glade'];
   return storyBiomes.indexOf(biomeId) >= 0;
@@ -8792,7 +8526,6 @@ function creatureCard(c, selectedKey, fromVoid) {
         ${(function(){ var mt=getCreatureMemoryText(c.id); return mt ? '<div class="attempt-history">'+mt+'</div>' : ''; })()}
         ${statBlock}
         <div class="card-actions">
-          <button class="btn" onclick="event.stopPropagation();openImageModal(${c.uid})" style="font-size:14px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px">🖼</button>
           ${fromVoid
             ? `<button class="btn btn-void" onclick="event.stopPropagation();recallFromVoid(${c.uid})" ${S.roster.length>=getRosterMax()?'disabled':''} style="flex:1">Recall to Roster</button>
                <button class="btn btn-danger" onclick="event.stopPropagation();confirmRelease(${c.uid},true)">Release</button>`
@@ -9448,7 +9181,7 @@ function openCreatureInspect(uid, fromVoid) {
   var captBiome = BIOMES.find(function(b){ return b.id === c.capturedIn; });
 
   // Portrait
-  var src = c.customImage || speciesArtSrc(c.id);
+  var src = speciesArtSrc(c.id);
   var portraitInner;
   if (src) {
     var pf = (c.unique && !c.unique.prismatic) ? _uniqueImgFilter(c.unique) : '';
@@ -9482,7 +9215,7 @@ function openCreatureInspect(uid, fromVoid) {
   // Action buttons
   var voidFull = S.void_.length >= getVoidMax();
   var rosterFull = S.roster.length >= getRosterMax();
-  var actBtns = '<button onclick="closeCreatureInspect();setTimeout(function(){openImageModal(' + uid + ')},60)" style="font-size:14px;padding:8px 12px;background:rgba(255,255,255,0.04);border:1px solid var(--border)">🖼</button>';
+  var actBtns = '';
   if (c.unique && c.id !== 'formless' && _cloudUser) {
     actBtns += '<button onclick="closeCreatureInspect();setTimeout(function(){showTradePanel(' + uid + ')},60)" style="padding:8px 14px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);color:#f97316;font-size:12px">⇄ Trade</button>';
   }
