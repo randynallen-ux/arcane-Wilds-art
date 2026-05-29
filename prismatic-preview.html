@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prismatic Preview</title>
+<style>
+  body { background: #03020d; font-family: 'Inter', sans-serif; color: #e2e8f0; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; gap: 32px; }
+  h2 { font-size: 11px; letter-spacing: 3px; color: #64748b; text-transform: uppercase; margin: 0 0 8px; }
+  .group { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+  .card { background: linear-gradient(135deg, #0f0e1a 0%, #0a0915 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 2px solid; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; width: 220px; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+
+  /* Normal */
+  .card.normal { border-left-color: #818cf8; }
+  /* Void-Touched */
+  .card.void-touched { border-left-color: #9333ea; }
+  /* Prismatic */
+  .card.prismatic-card-border { animation: prismatic-border 3s linear infinite; border-left-width: 2px; }
+
+  .img-wrap { width: 44px; height: 44px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: rgba(0,0,0,0.3); }
+  .img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Normal glow */
+  .glow-normal { filter: drop-shadow(0 0 4px #818cf888); }
+  /* Void glow */
+  .glow-void { filter: drop-shadow(0 0 8px #a855f788); }
+  /* Prismatic glow */
+  .glow-prismatic { animation: prismatic-hue 3s linear infinite !important; }
+
+  /* Unique image tinting */
+  .tint-void { filter: sepia(0.35) hue-rotate(246deg) saturate(1.5) brightness(1.05); }
+
+  .creature-name { font-weight: 600; font-size: 13px; white-space: nowrap; }
+  .creature-type { font-size: 9px; color: #818cf8; margin-top: 3px; }
+  .badge { font-size: 8px; border: 1px solid; border-radius: 3px; padding: 1px 5px; display: inline-block; margin-top: 4px; white-space: nowrap; }
+  .badge.void { border-color: rgba(147,51,234,0.4); background: #1a0a2e; color: #a855f7; }
+  .badge.prismatic { animation: prismatic-text 3s linear infinite; border-color: #ff6b9d55; background: #0a0010; }
+
+  @keyframes prismatic-hue {
+    0%   { filter: drop-shadow(0 0 18px #ff6b9d) hue-rotate(0deg) brightness(1.1); }
+    16%  { filter: drop-shadow(0 0 22px #ffa94d) hue-rotate(60deg) brightness(1.15); }
+    33%  { filter: drop-shadow(0 0 20px #ffd93d) hue-rotate(120deg) brightness(1.1); }
+    50%  { filter: drop-shadow(0 0 22px #6bcb77) hue-rotate(180deg) brightness(1.15); }
+    66%  { filter: drop-shadow(0 0 20px #4d96ff) hue-rotate(240deg) brightness(1.1); }
+    83%  { filter: drop-shadow(0 0 22px #c77dff) hue-rotate(300deg) brightness(1.15); }
+    100% { filter: drop-shadow(0 0 18px #ff6b9d) hue-rotate(360deg) brightness(1.1); }
+  }
+  @keyframes prismatic-text {
+    0%   { color: #ff6b9d; }
+    16%  { color: #ffa94d; }
+    33%  { color: #ffd93d; }
+    50%  { color: #6bcb77; }
+    66%  { color: #4d96ff; }
+    83%  { color: #c77dff; }
+    100% { color: #ff6b9d; }
+  }
+  @keyframes prismatic-border {
+    0%   { border-color: #ff6b9d55; box-shadow: 0 0 16px #ff6b9d22; }
+    33%  { border-color: #ffd93d55; box-shadow: 0 0 20px #ffd93d22; }
+    66%  { border-color: #4d96ff55; box-shadow: 0 0 16px #4d96ff22; }
+    100% { border-color: #ff6b9d55; box-shadow: 0 0 16px #ff6b9d22; }
+  }
+  @keyframes glow-pulse-strong {
+    0%,100% { filter: drop-shadow(0 0 14px var(--glow-col,#ffffff55)); }
+    50%     { filter: drop-shadow(0 0 30px var(--glow-col,#ffffffaa)); }
+  }
+
+  .note { font-size: 10px; color: #475569; text-align: center; max-width: 680px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h2>Unique Creature Visual Comparison</h2>
+
+<div class="group">
+
+  <!-- NORMAL -->
+  <div style="text-align:center">
+    <div style="font-size:10px;color:#64748b;margin-bottom:8px">Normal</div>
+    <div class="card normal">
+      <div class="img-wrap glow-normal">
+        <img src="https://qeaqbwqtkebimntlrchb.supabase.co/storage/v1/object/public/creature-art/mossbug.png" alt="mossbug">
+      </div>
+      <div>
+        <div class="creature-name" style="color:#818cf8">Mossbug</div>
+        <div class="creature-type">FLORA</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VOID-TOUCHED UNIQUE -->
+  <div style="text-align:center">
+    <div style="font-size:10px;color:#a855f7;margin-bottom:8px">Unique — Void-Touched</div>
+    <div class="card void-touched">
+      <div class="img-wrap glow-void">
+        <img class="tint-void" src="https://qeaqbwqtkebimntlrchb.supabase.co/storage/v1/object/public/creature-art/mossbug.png" alt="mossbug">
+      </div>
+      <div>
+        <div class="creature-name" style="color:#a855f7">Mossbug</div>
+        <div class="creature-type">FLORA</div>
+        <div class="badge void">✦ UNIQUE — Void-Touched</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRISMATIC UNIQUE -->
+  <div style="text-align:center">
+    <div style="font-size:10px;color:#ff6b9d;margin-bottom:8px">Unique — Prismatic ✦</div>
+    <div class="card prismatic-card-border">
+      <div class="img-wrap glow-prismatic">
+        <img src="https://qeaqbwqtkebimntlrchb.supabase.co/storage/v1/object/public/creature-art/mossbug.png" alt="mossbug">
+      </div>
+      <div>
+        <div class="creature-name" style="color:#e2e8f0">Mossbug</div>
+        <div class="creature-type">FLORA</div>
+        <div class="badge prismatic">✦ UNIQUE — Prismatic</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="note">
+  Prismatic: the portrait cycles through the full visible spectrum via a <code>hue-rotate 0→360°</code> animation every 3 seconds, with a matching rainbow drop-shadow glow and animated border + badge text. It is the rarest unique variant, only available through Rites.
+</p>
+
+</body>
+</html>
