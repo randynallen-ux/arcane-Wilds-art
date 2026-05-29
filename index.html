@@ -1443,6 +1443,18 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   from { opacity: 0; transform: translateY(40px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes inspect-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+#creature-inspect-inner { animation: inspect-slide-up .32s cubic-bezier(.16,1,.3,1) both; }
+.inspect-portrait-wrap { width:100%;height:220px;overflow:hidden;position:relative;flex-shrink:0;background:#000; }
+.inspect-portrait-wrap img { width:100%;height:100%;object-fit:cover;display:block; }
+.inspect-portrait-fade { position:absolute;bottom:0;left:0;right:0;height:90px;background:linear-gradient(transparent,var(--bg2));pointer-events:none; }
+.inspect-close-btn { position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);color:var(--text-muted);font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center; }
+.inspect-body { padding:14px 18px 10px;flex:1;overflow-y:auto; }
+.inspect-actions { padding:12px 18px 32px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;background:rgba(0,0,0,0.2); }
+.inspect-actions button { border-radius:10px;cursor:pointer;font-family:inherit; }
 .release-farewell {
   font-size: 13px; color: var(--text-dim);
   font-family: 'Inter', sans-serif; font-style: italic;
@@ -2124,6 +2136,11 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       </div>
 
     </div>
+  </div>
+
+  <!-- CREATURE INSPECT MODAL -->
+  <div id="creature-inspect-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:650;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeCreatureInspect()">
+    <div id="creature-inspect-inner" style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden"></div>
   </div>
 
   <!-- FIELD NOTE MODAL -->
@@ -9420,17 +9437,112 @@ function renderCraft() {
       + (_craftPhase >= 2 ? refineSection : '') + (_craftPhase >= 1 ? upgradeSection : '') + wardenPostHtml + ritesSection;
 
 }
+function openCreatureInspect(uid, fromVoid) {
+  var list = fromVoid ? S.void_ : S.roster;
+  var c = list.find(function(x){ return x.uid == uid; });
+  if (!c) return;
+
+  var rc = RARITIES[c.rarity];
+  var col = c.unique ? c.unique.color : rc.color;
+  var glow = c.unique ? c.unique.glow : rc.glow;
+  var captBiome = BIOMES.find(function(b){ return b.id === c.capturedIn; });
+
+  // Portrait
+  var src = c.customImage || speciesArtSrc(c.id);
+  var portraitInner;
+  if (src) {
+    var pf = (c.unique && !c.unique.prismatic) ? _uniqueImgFilter(c.unique) : '';
+    portraitInner = '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover' + (pf ? ';filter:' + pf : '') + '" onerror="this.style.display=\'none\'">';
+  } else {
+    portraitInner = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:90px">' + c.emoji + '</div>';
+  }
+  var prismaticClass = (c.unique && c.unique.prismatic) ? 'prismatic-img' : '';
+
+  // Stats
+  var STAT_MAX = {hp:20,atk:15,def:15,spd:15,mana:15};
+  var STAT_COL = {hp:'#f87171',atk:'#f97316',def:'#60a5fa',spd:'#4ade80',mana:'#e879f9'};
+  var STAT_LABELS = {hp:'HP',atk:'ATK',def:'DEF',spd:'SPD',mana:'MANA'};
+  var cs = creatureStats(c);
+  var affinityKeys = TYPE_AFFINITY[c.type] || [];
+  var statRows = Object.keys(cs).map(function(k) {
+    var val = cs[k];
+    var pct = Math.min(100, Math.round((val / STAT_MAX[k]) * 100));
+    var isAff = affinityKeys.indexOf(k) >= 0;
+    return '<div class="stat-row">'
+      + '<div class="stat-row-label" style="color:' + (isAff ? STAT_COL[k] : '') + '">' + STAT_LABELS[k] + '</div>'
+      + '<div class="stat-row-bar"><div class="stat-row-fill" style="width:' + pct + '%;background:' + STAT_COL[k] + ';opacity:' + (isAff ? 1 : 0.55) + '"></div></div>'
+      + '<div class="stat-row-val">' + val + (isAff ? '<span style="color:' + STAT_COL[k] + ';font-size:8px">↑</span>' : '') + '</div>'
+      + '</div>';
+  }).join('');
+  var affinityLabel = affinityKeys.map(function(s){ return STAT_LABELS[s]; }).join(' + ');
+
+  // Memory
+  var memText = getCreatureMemoryText(c.id);
+
+  // Action buttons
+  var voidFull = S.void_.length >= getVoidMax();
+  var rosterFull = S.roster.length >= getRosterMax();
+  var actBtns = '<button onclick="closeCreatureInspect();setTimeout(function(){openImageModal(' + uid + ')},60)" style="font-size:14px;padding:8px 12px;background:rgba(255,255,255,0.04);border:1px solid var(--border)">🖼</button>';
+  if (c.unique && c.id !== 'formless' && _cloudUser) {
+    actBtns += '<button onclick="closeCreatureInspect();setTimeout(function(){showTradePanel(' + uid + ')},60)" style="padding:8px 14px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);color:#f97316;font-size:12px">⇄ Trade</button>';
+  }
+  if (fromVoid) {
+    actBtns += '<button onclick="closeCreatureInspect();setTimeout(function(){recallFromVoid(' + uid + ')},60)" ' + (rosterFull ? 'disabled' : '') + ' style="flex:1;padding:8px 14px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);color:#a78bfa;font-size:12px">'
+      + (rosterFull ? 'Roster Full' : 'Recall to Roster') + '</button>';
+    actBtns += '<button onclick="closeCreatureInspect();setTimeout(function(){confirmRelease(' + uid + ',true)},60)" style="padding:8px 14px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;font-size:12px">Release</button>';
+  } else {
+    actBtns += '<button onclick="closeCreatureInspect();setTimeout(function(){sendToVoid(' + uid + ')},60)" ' + (voidFull ? 'disabled' : '') + ' style="flex:1;padding:8px 14px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);color:#a78bfa;font-size:12px">'
+      + (voidFull ? 'Void Full' : 'Send to Void') + '</button>';
+    actBtns += '<button onclick="closeCreatureInspect();setTimeout(function(){confirmRelease(' + uid + ',false)},60)" style="padding:8px 14px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;font-size:12px">Release</button>';
+  }
+
+  var html = ''
+    + '<div class="inspect-portrait-wrap ' + prismaticClass + '" style="--glow-col:' + glow + '88">'
+    +   portraitInner
+    +   '<div class="inspect-portrait-fade"></div>'
+    +   '<button class="inspect-close-btn" onclick="closeCreatureInspect()">×</button>'
+    + '</div>'
+    + '<div class="inspect-body">'
+    +   '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px">'
+    +     '<div>'
+    +       '<div style="font-size:22px;font-weight:700;color:' + col + ';font-family:Raleway,sans-serif;line-height:1.1">' + c.name + '</div>'
+    +       (c.uniqueName ? '<div style="font-size:12px;color:' + glow + ';font-style:italic;opacity:0.85;margin-top:2px">"' + c.uniqueName + '"</div>' : '')
+    +     '</div>'
+    +     '<div style="flex-shrink:0;padding-top:4px">' + stars(rc.stars, col) + '</div>'
+    +   '</div>'
+    +   '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'
+    +     '<span class="t-' + c.type + '" style="font-size:9px">' + c.type.toUpperCase() + '</span>'
+    +     '<span style="font-size:9px;color:var(--text-muted)">' + rc.name + '</span>'
+    +     (captBiome ? '<span style="font-size:9px;color:var(--text-muted)">' + captBiome.emoji + ' ' + captBiome.name + '</span>' : '')
+    +     (c.unique ? '<span style="font-size:8px;border:1px solid ' + c.unique.color + '55;border-radius:4px;padding:2px 7px;background:' + c.unique.bg + '" class="' + (c.unique.prismatic ? 'prismatic-text prismatic-card' : '') + '"><span ' + (c.unique.prismatic ? '' : 'style="color:' + c.unique.glow + '"') + '>✦ UNIQUE — ' + c.unique.name + '</span></span>' : '')
+    +     (c.bonded ? '<span class="bond-badge">🤝 BONDED</span>' : '')
+    +   '</div>'
+    +   '<div style="font-size:12px;color:var(--text-dim);font-style:italic;line-height:1.75;margin-bottom:10px">' + c.lore + '</div>'
+    +   '<div style="font-size:11px;color:var(--text-muted);line-height:1.65;margin-bottom:14px">' + c.desc + '</div>'
+    +   (memText ? '<div class="attempt-history" style="margin-bottom:12px">' + memText + '</div>' : '')
+    +   '<div class="stat-block">'
+    +     '<div class="stat-block-title">Combat Stats</div>'
+    +     statRows
+    +     (affinityLabel ? '<div class="affinity-note">🔗 ' + c.type + ' bonds with ' + affinityLabel
+    +       + (c.bonded ? ' <span style="color:#e879f9;font-weight:600">· +20% bonded</span>' : '')
+    +       + (c.unique && c.unique.prismatic ? ' <span style="animation:prismatic-text 3s linear infinite;font-weight:600">· ×2 prismatic</span>' : '')
+    +       + '</div>' : '')
+    +   '</div>'
+    + '</div>'
+    + '<div class="inspect-actions">' + actBtns + '</div>';
+
+  document.getElementById('creature-inspect-inner').innerHTML = html;
+  document.getElementById('creature-inspect-modal').style.display = 'flex';
+}
+
+function closeCreatureInspect() {
+  document.getElementById('creature-inspect-modal').style.display = 'none';
+}
+
 function toggleCreatureCard(el) {
   const uid = Number(el.dataset.uid);
   const fromVoid = el.dataset.fromvoid === '1';
-  const isOpen = el.dataset.open === '1';
-  if (fromVoid) {
-    S.selectedVoidCreature = isOpen ? null : S.void_.find(function(x){ return x.uid == uid; });
-    renderVoid();
-  } else {
-    S.selectedCreature = isOpen ? null : S.roster.find(function(x){ return x.uid == uid; });
-    renderRoster();
-  }
+  openCreatureInspect(uid, fromVoid);
 }
 
 function atlasEntryClick(el) {
