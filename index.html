@@ -7868,13 +7868,19 @@ function setToggleBtn(id, on) {
 
 function menuToggleMusic() {
   _audioEnabled = !_audioEnabled;
-  if (!_audioEnabled) stopMusic(true, true);
-  else if (S.activeBiome) playBiomeMusic(S.activeBiome.id);
+  if (!_audioEnabled) {
+    stopMusic(false);  // immediate — no fade on explicit toggle-off
+    if (_musicGain) { _musicGain.gain.cancelScheduledValues(getAudioCtx().currentTime); _musicGain.gain.value = 0; }
+  } else {
+    if (_musicGain) _musicGain.gain.value = _musicVol;
+    if (S.activeBiome) playBiomeMusic(S.activeBiome.id);
+  }
   setToggleBtn('menu-music-btn', _audioEnabled);
 }
 
 function menuToggleSfx() {
   _sfxEnabled = !_sfxEnabled;
+  if (_sfxGain) _sfxGain.gain.value = _sfxEnabled ? _sfxVol : 0;
   setToggleBtn('menu-sfx-btn', _sfxEnabled);
 }
 
