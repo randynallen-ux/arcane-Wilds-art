@@ -2026,7 +2026,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   <div class="tab-bar">
     <button class="tab-btn active" onclick="switchTab('hunt')"><span class="tab-icon">🌿</span>Hunt</button>
     <button class="tab-btn" onclick="switchTab('craft')"><span class="tab-icon">🔮</span>Craft</button>
-    <button class="tab-btn" onclick="switchTab('roster')"><span class="tab-icon">🐾</span>Roster</button>
+    <button class="tab-btn" onclick="switchTab('roster')"><span class="tab-icon">🐾</span>Roster<span id="trade-badge" style="display:none;background:#f97316;color:white;font-size:8px;border-radius:6px;padding:0 4px;margin-left:3px;font-weight:700;vertical-align:middle">0</span></button>
     <button class="tab-btn" onclick="switchTab('void')"><span class="tab-icon">✨</span>Void</button>
     <button class="tab-btn" id="journal-tab-btn" onclick="switchTab('journal')"><span class="tab-icon">📋</span>Journal</button>
     <button class="tab-btn" onclick="switchTab('bestiary')"><span class="tab-icon">🦋</span>Bestiary</button>
@@ -2200,11 +2200,24 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         <div style="padding:14px;background:rgba(201,168,76,0.07);border:1px solid rgba(201,168,76,0.2);border-radius:12px">
           <div style="font-size:10px;color:var(--text-muted);letter-spacing:2px;margin-bottom:4px">SIGNED IN AS</div>
           <div id="cloud-user-email" style="font-size:13px;color:var(--text)"></div>
+          <div id="cloud-friend-code" style="font-size:12px;color:var(--gold);letter-spacing:2px;margin-top:4px;font-family:Cinzel,serif"></div>
           <div id="cloud-sync-status" style="font-size:10px;color:var(--text-muted);margin-top:4px"></div>
         </div>
         <button onclick="manualCloudSync()" style="width:100%;padding:12px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);border-radius:12px;color:var(--gold);font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;cursor:pointer">☁ SYNC NOW</button>
+        <button onclick="hideCloudAuthModal();showIncomingOffers()" style="width:100%;padding:12px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.3);border-radius:12px;color:#f97316;font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;cursor:pointer">⇄ VIEW TRADE OFFERS <span id="trade-count-badge"></span></button>
         <button onclick="signOut()" style="width:100%;padding:11px;background:none;border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-family:Raleway,sans-serif;font-size:11px;cursor:pointer">Sign out</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Trade panel -->
+  <div id="trade-panel" style="display:none;position:fixed;inset:0;z-index:850;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.82)" onclick="if(event.target===this)closeTrade()">
+    <div style="background:var(--bg2);border:1px solid var(--border-bright);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:24px 20px 40px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div style="font-family:Cinzel,serif;font-size:13px;letter-spacing:3px;color:var(--gold)">⇄ TRADE</div>
+        <button onclick="closeTrade()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+      </div>
+      <div id="trade-panel-content"></div>
     </div>
   </div>
 
@@ -3587,6 +3600,7 @@ function doCapture() {
       S.void_.push(captured);
     } else {
       S.roster.push(captured);
+      if (captured.unique && captured.id !== 'formless' && _cloudUser) registerCreature(captured, null);
     }
     S.lifetime.total++;
     if (!S.lifetime.rarities.includes(captured.rarity)) S.lifetime.rarities.push(captured.rarity);
@@ -8748,7 +8762,8 @@ function creatureCard(c, selectedKey, fromVoid) {
           ${fromVoid
             ? `<button class="btn btn-void" onclick="event.stopPropagation();recallFromVoid(${c.uid})" ${S.roster.length>=getRosterMax()?'disabled':''} style="flex:1">Recall to Roster</button>
                <button class="btn btn-danger" onclick="event.stopPropagation();confirmRelease(${c.uid},true)">Release</button>`
-            : `<button class="btn btn-void" onclick="event.stopPropagation();sendToVoid(${c.uid})" ${S.void_.length>=VOID_MAX?'disabled':''} style="flex:1">Send to Void</button>
+            : `${!fromVoid && c.unique && c.id !== 'formless' && _cloudUser ? `<button class="btn" onclick="event.stopPropagation();showTradePanel(${c.uid})" style="padding:6px 10px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.35);border-radius:8px;color:#f97316;font-size:11px;white-space:nowrap">⇄ Trade</button>` : ''}
+               <button class="btn btn-void" onclick="event.stopPropagation();sendToVoid(${c.uid})" ${S.void_.length>=VOID_MAX?'disabled':''} style="flex:1">Send to Void</button>
                <button class="btn btn-danger" onclick="event.stopPropagation();confirmRelease(${c.uid},false)">Release</button>`}
         </div>
       </div>` : ''}
@@ -12812,6 +12827,12 @@ var _supabase = window.supabase
 var _cloudUser     = null;   // current auth.User or null
 var _cloudSyncedAt = null;   // timestamp of last successful cloud save
 var _cloudTab      = 'signin';
+var _myFriendCode  = null;
+var _tradeRealtime = null;
+var _pendingOffers = [];  // incoming offers awaiting review
+var _myFriendCode   = null;
+var _tradeRealtime  = null;
+var _pendingOffers  = [];  // incoming offers awaiting review
 
 // ── Auth state listener ───────────────────────────────────────────────────
 if (_supabase) {
@@ -12820,6 +12841,9 @@ if (_supabase) {
     updateMenuCloudStatus();
     if (event === 'SIGNED_IN') {
       loadCloudSave();
+      fetchMyProfile();
+      registerExistingUniques();
+      initTradeRealtime();
     }
   });
   // Restore existing session on page load
@@ -12828,6 +12852,9 @@ if (_supabase) {
       _cloudUser = res.data.session.user;
       updateMenuCloudStatus();
       loadCloudSave();
+      fetchMyProfile();
+      registerExistingUniques();
+      initTradeRealtime();
     }
   });
 }
@@ -12854,6 +12881,8 @@ function showCloudSignedInView() {
   document.getElementById('cloud-form-fields').style.display = 'none';
   document.getElementById('cloud-signed-in-view').style.display = 'flex';
   document.getElementById('cloud-user-email').textContent  = _cloudUser ? _cloudUser.email : '';
+  var fcEl = document.getElementById('cloud-friend-code');
+  if (fcEl) fcEl.textContent = _myFriendCode ? 'Friend code: ' + _myFriendCode : '';
   var syncText = _cloudSyncedAt
     ? 'Last synced ' + new Date(_cloudSyncedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
     : 'Not yet synced this session';
@@ -12939,6 +12968,322 @@ function manualCloudSync() {
   saveToCloud(function(ok) {
     toast(ok ? '☁ Synced to cloud.' : 'Sync failed — check connection.');
     showCloudSignedInView();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TRADING SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Profile / friend code ─────────────────────────────────────────────────
+function fetchMyProfile() {
+  if (!_supabase || !_cloudUser) return;
+  _supabase.from('profiles').select('friend_code').eq('id', _cloudUser.id).maybeSingle()
+    .then(function(res) {
+      if (res.data) {
+        _myFriendCode = res.data.friend_code;
+        var fcEl = document.getElementById('cloud-friend-code');
+        if (fcEl) fcEl.textContent = 'Friend code: ' + _myFriendCode;
+      }
+    });
+}
+
+// ── Creature registration ─────────────────────────────────────────────────
+function registerCreature(c, cb) {
+  if (!_supabase || !_cloudUser || !c.unique || c.id === 'formless') { if (cb) cb(null); return; }
+  if (c.serverUid) { if (cb) cb(c.serverUid); return; }
+  _supabase.from('creatures').insert({
+    owner_id: _cloudUser.id,
+    species_id: c.id,
+    rarity: c.rarity,
+    unique_key: c.unique.key || c.unique.name || '',
+    unique_data: c.unique,
+    creature_data: {
+      name: c.name, type: c.type, rarity: c.rarity, uid: c.uid,
+      stats: c.stats, lore: c.lore || '', uniqueName: c.uniqueName || null,
+      bonded: c.bonded || false, unique: c.unique
+    }
+  }).select('id').single()
+    .then(function(res) {
+      if (!res.error && res.data) {
+        c.serverUid = res.data.id;
+        autoSave();
+        if (cb) cb(res.data.id);
+      } else {
+        if (cb) cb(null);
+      }
+    });
+}
+
+function registerExistingUniques() {
+  if (!_supabase || !_cloudUser) return;
+  var unregistered = S.roster.filter(function(c){ return c.unique && c.id !== 'formless' && !c.serverUid; });
+  unregistered.forEach(function(c){ registerCreature(c, null); });
+}
+
+// ── Trade realtime ────────────────────────────────────────────────────────
+function initTradeRealtime() {
+  if (!_supabase || !_cloudUser) return;
+  if (_tradeRealtime) { _supabase.removeChannel(_tradeRealtime); }
+  _tradeRealtime = _supabase
+    .channel('trade-offers-' + _cloudUser.id)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'trade_offers',
+      filter: 'to_user_id=eq.' + _cloudUser.id
+    }, function(payload) {
+      if (payload.new && payload.new.status === 'pending') {
+        handleIncomingOffer(payload.new);
+      }
+    })
+    .subscribe();
+  // Load any existing pending offers
+  _supabase.from('trade_offers')
+    .select('*, offered:offered_creature_id(*), wanted:wanted_creature_id(*)')
+    .eq('to_user_id', _cloudUser.id)
+    .eq('status', 'pending')
+    .then(function(res) {
+      if (res.data && res.data.length) {
+        _pendingOffers = res.data;
+        updateTradeBadge();
+      }
+    });
+}
+
+function handleIncomingOffer(offer) {
+  if (_pendingOffers.find(function(o){ return o.id === offer.id; })) return;
+  _pendingOffers.push(offer);
+  updateTradeBadge();
+  toast('⇄ New trade offer received!');
+}
+
+function updateTradeBadge() {
+  var badge = document.getElementById('trade-badge');
+  if (!badge) return;
+  var count = _pendingOffers.filter(function(o){ return o.status === 'pending'; }).length;
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'inline-block' : 'none';
+}
+
+// ── Trade UI ──────────────────────────────────────────────────────────────
+function renderTradePanelContent(html) {
+  document.getElementById('trade-panel-content').innerHTML = html;
+}
+
+function closeTrade() {
+  document.getElementById('trade-panel').style.display = 'none';
+}
+
+function showTradePanel(uid) {
+  if (!_cloudUser) { toast('Sign in to trade.'); return; }
+  if (!_myFriendCode) { toast('Setting up trade profile...'); fetchMyProfile(); return; }
+  var c = S.roster.find(function(x){ return x.uid === uid; });
+  if (!c || !c.unique) return;
+  var panel = document.getElementById('trade-panel');
+  panel.style.display = 'flex';
+  var lockUntil = c.tradeLockUntil || null;
+  if (lockUntil && Date.now() < lockUntil) {
+    var hrs = Math.ceil((lockUntil - Date.now()) / 3600000);
+    renderTradePanelContent('<div style="text-align:center;padding:20px 0"><div style="font-size:32px;margin-bottom:12px">&#x1F512;</div><div style="color:var(--text-muted);font-size:13px">This creature is trade-locked for ' + hrs + ' more hour' + (hrs!==1?'s':'') + '.</div></div><button onclick="closeTrade()" class="btn" style="width:100%;margin-top:16px">Close</button>');
+    return;
+  }
+  panel._offeringUid = uid;
+  var col = c.unique.color;
+  var html = '<div style="margin-bottom:16px;padding:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;display:flex;gap:12px;align-items:center">'
+    + '<div>' + creatureThumbHtml(c, 40) + '</div>'
+    + '<div><div style="font-size:11px;color:' + col + ';font-weight:600">' + c.name + '</div>'
+    + '<div style="font-size:9px;color:var(--text-muted);letter-spacing:1px">&#x2726; ' + (c.unique.name||'') + ' &middot; ' + c.rarity + '</div></div>'
+    + '</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Enter the friend code of the player you want to trade with:</div>'
+    + '<input id="trade-code-input" type="text" placeholder="WILDS-XXXX" maxlength="10" autocomplete="off"'
+    + ' style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:Raleway,sans-serif;letter-spacing:2px;box-sizing:border-box;outline:none;text-transform:uppercase"/>'
+    + '<div id="trade-step1-err" style="font-size:11px;color:#f87171;margin-top:6px;display:none"></div>'
+    + '<button onclick="tradeLookupCode()" style="width:100%;margin-top:12px;padding:12px;background:var(--gold);border:none;border-radius:12px;color:#07050f;font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;cursor:pointer;font-weight:700">FIND PLAYER &#x2192;</button>'
+    + '<button onclick="closeTrade()" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-family:Raleway,sans-serif;font-size:11px;cursor:pointer">Cancel</button>';
+  renderTradePanelContent(html);
+}
+
+function tradeLookupCode() {
+  var code = (document.getElementById('trade-code-input').value || '').trim().toUpperCase();
+  var errEl = document.getElementById('trade-step1-err');
+  errEl.style.display = 'none';
+  if (!code) { errEl.textContent = 'Enter a friend code.'; errEl.style.display = 'block'; return; }
+  if (code === _myFriendCode) { errEl.textContent = "That's your own code."; errEl.style.display = 'block'; return; }
+  document.getElementById('trade-panel-content').innerHTML = '<div style="text-align:center;padding:30px 0;color:var(--text-muted)">Looking up player...</div>';
+  var offeringUid = document.getElementById('trade-panel')._offeringUid;
+  var offeringC = S.roster.find(function(x){ return x.uid === offeringUid; });
+  _supabase.rpc('get_tradeable_by_code', { friend_code_input: code })
+    .then(function(res) {
+      if (res.error || !res.data) {
+        renderTradePanelContent('<div style="text-align:center;padding:20px;color:#f87171">Player not found or no tradeable creatures.</div><button onclick="closeTrade()" class="btn" style="width:100%;margin-top:12px">Close</button>');
+        return;
+      }
+      var creatures = res.data;
+      var matching = creatures.filter(function(x){ return x.rarity === offeringC.rarity; });
+      if (!matching.length) {
+        renderTradePanelContent('<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">That player has no ' + offeringC.rarity + ' uniques available to trade.</div><button onclick="closeTrade()" class="btn" style="width:100%;margin-top:12px">Close</button>');
+        return;
+      }
+      var rc = RARITIES[offeringC.rarity] || {};
+      var html = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Select a ' + offeringC.rarity + ' unique to request:</div>'
+        + matching.map(function(cr) {
+          var ud = cr.unique_data || {};
+          var col = ud.color || rc.color || 'var(--gold)';
+          var specData = CREATURES.find(function(x){ return x.id === cr.species_id; }) || {};
+          return '<div onclick="tradeSelectWanted(\'' + cr.creature_id + '\')" style="padding:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px">'
+            + '<div style="font-size:28px">' + (specData.emoji || '?') + '</div>'
+            + '<div><div style="font-size:12px;color:' + col + ';font-weight:600">' + (specData.name || cr.species_id) + '</div>'
+            + '<div style="font-size:9px;color:var(--text-muted)">&#x2726; ' + (ud.name||'') + '</div></div>'
+            + '</div>';
+        }).join('')
+        + '<button onclick="closeTrade()" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:Raleway,sans-serif">Cancel</button>';
+      document.getElementById('trade-panel')._targetCode = code;
+      document.getElementById('trade-panel')._targetCreatures = matching;
+      renderTradePanelContent(html);
+    });
+}
+
+function tradeSelectWanted(serverUid) {
+  var panel = document.getElementById('trade-panel');
+  var offeringC = S.roster.find(function(x){ return x.uid === panel._offeringUid; });
+  var wantedData = (panel._targetCreatures || []).find(function(x){ return x.creature_id === serverUid; });
+  if (!offeringC || !wantedData) return;
+  panel._wantedServerUid = serverUid;
+  var rc = RARITIES[offeringC.rarity] || {};
+  var col1 = offeringC.unique ? offeringC.unique.color : rc.color;
+  var ud = wantedData.unique_data || {};
+  var col2 = ud.color || rc.color || 'var(--gold)';
+  var specData = CREATURES.find(function(x){ return x.id === wantedData.species_id; }) || {};
+  var html = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:16px;text-align:center">Confirm trade proposal:</div>'
+    + '<div style="display:flex;gap:10px;align-items:center;justify-content:center;margin-bottom:20px">'
+    + '<div style="flex:1;padding:14px;background:rgba(255,255,255,0.04);border:1px solid ' + col1 + '44;border-radius:10px;text-align:center">'
+    + '<div style="font-size:24px;margin-bottom:4px">' + creatureThumbHtml(offeringC, 36) + '</div>'
+    + '<div style="font-size:11px;color:' + col1 + ';font-weight:600">' + offeringC.name + '</div>'
+    + '<div style="font-size:9px;color:var(--text-muted)">&#x2726; ' + (offeringC.unique.name||'') + '</div>'
+    + '<div style="font-size:8px;color:var(--text-muted);margin-top:2px;letter-spacing:1px">YOU OFFER</div>'
+    + '</div>'
+    + '<div style="font-size:20px;color:var(--text-muted)">&#x21C4;</div>'
+    + '<div style="flex:1;padding:14px;background:rgba(255,255,255,0.04);border:1px solid ' + col2 + '44;border-radius:10px;text-align:center">'
+    + '<div style="font-size:24px;margin-bottom:4px">' + (specData.emoji||'?') + '</div>'
+    + '<div style="font-size:11px;color:' + col2 + ';font-weight:600">' + (specData.name||wantedData.species_id) + '</div>'
+    + '<div style="font-size:9px;color:var(--text-muted)">&#x2726; ' + (ud.name||'') + '</div>'
+    + '<div style="font-size:8px;color:var(--text-muted);margin-top:2px;letter-spacing:1px">YOU RECEIVE</div>'
+    + '</div>'
+    + '</div>'
+    + '<div id="trade-confirm-err" style="font-size:11px;color:#f87171;margin-bottom:10px;display:none"></div>'
+    + '<button onclick="tradeConfirm()" style="width:100%;padding:12px;background:var(--gold);border:none;border-radius:12px;color:#07050f;font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;cursor:pointer;font-weight:700">SEND TRADE OFFER</button>'
+    + '<button onclick="closeTrade()" style="width:100%;margin-top:8px;padding:10px;background:none;border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:Raleway,sans-serif">Cancel</button>';
+  renderTradePanelContent(html);
+}
+
+function tradeConfirm() {
+  var panel = document.getElementById('trade-panel');
+  var offeringC = S.roster.find(function(x){ return x.uid === panel._offeringUid; });
+  if (!offeringC || !offeringC.serverUid) {
+    registerCreature(offeringC, function(uid) {
+      if (uid) tradeConfirm();
+      else { var e = document.getElementById('trade-confirm-err'); if(e){e.textContent='Registration failed.';e.style.display='block';} }
+    });
+    return;
+  }
+  var errEl = document.getElementById('trade-confirm-err');
+  if (errEl) errEl.style.display = 'none';
+  _supabase.rpc('propose_trade', {
+    friend_code_target: panel._targetCode,
+    offered_creature_id: offeringC.serverUid,
+    wanted_creature_id: panel._wantedServerUid
+  }).then(function(res) {
+    if (res.error || (res.data && !res.data.ok)) {
+      var msg = (res.data && res.data.error) || (res.error && res.error.message) || 'Trade failed.';
+      renderTradePanelContent('<div style="text-align:center;padding:20px"><div style="font-size:11px;color:#f87171;margin-bottom:16px">' + msg + '</div><button onclick="closeTrade()" class="btn" style="width:100%">Close</button></div>');
+    } else {
+      renderTradePanelContent('<div style="text-align:center;padding:20px"><div style="font-size:28px;margin-bottom:12px">&#x1F4EC;</div><div style="color:var(--text);font-size:13px;margin-bottom:16px">Trade offer sent! The other player will be notified.</div><button onclick="closeTrade()" class="btn" style="width:100%">Done</button></div>');
+    }
+  });
+}
+
+function showIncomingOffers() {
+  var panel = document.getElementById('trade-panel');
+  panel.style.display = 'flex';
+  var pending = _pendingOffers.filter(function(o){ return o.status === 'pending'; });
+  if (!pending.length) {
+    renderTradePanelContent('<div style="text-align:center;padding:30px 0;color:var(--text-muted)">No pending trade offers.</div><button onclick="closeTrade()" class="btn" style="width:100%;margin-top:12px">Close</button>');
+    return;
+  }
+  var html = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:14px">Incoming trade offers:</div>';
+  pending.forEach(function(offer) {
+    var offered = offer.offered || {};
+    var wanted  = offer.wanted  || {};
+    var udOff = offered.unique_data || {};
+    var udWnt = wanted.unique_data  || {};
+    var specOff = CREATURES.find(function(x){ return x.id === offered.species_id; }) || {};
+    var specWnt = CREATURES.find(function(x){ return x.id === wanted.species_id;  }) || {};
+    var rc = RARITIES[offered.rarity] || {};
+    html += '<div style="padding:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;margin-bottom:10px">'
+      + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">'
+      + '<div style="flex:1;text-align:center"><div style="font-size:20px">' + (specOff.emoji||'?') + '</div>'
+      + '<div style="font-size:10px;color:' + (udOff.color||rc.color||'var(--text)') + '">' + (specOff.name||offered.species_id||'?') + '</div>'
+      + '<div style="font-size:8px;color:var(--text-muted)">&#x2726; ' + (udOff.name||'') + '</div>'
+      + '<div style="font-size:7px;color:var(--text-muted);margin-top:2px">THEY OFFER</div></div>'
+      + '<div style="color:var(--text-muted)">&#x21C4;</div>'
+      + '<div style="flex:1;text-align:center"><div style="font-size:20px">' + (specWnt.emoji||'?') + '</div>'
+      + '<div style="font-size:10px;color:' + (udWnt.color||rc.color||'var(--text)') + '">' + (specWnt.name||wanted.species_id||'?') + '</div>'
+      + '<div style="font-size:8px;color:var(--text-muted)">&#x2726; ' + (udWnt.name||'') + '</div>'
+      + '<div style="font-size:7px;color:var(--text-muted);margin-top:2px">YOUR CREATURE</div></div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button onclick="acceptTradeOffer(\'' + offer.id + '\',\'' + (offered.id||'') + '\',\'' + (wanted.id||'') + '\')" style="flex:1;padding:9px;background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.3);border-radius:8px;color:#4ade80;font-size:11px;cursor:pointer;font-family:Raleway,sans-serif">Accept</button>'
+      + '<button onclick="rejectTradeOffer(\'' + offer.id + '\')" style="flex:1;padding:9px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:Raleway,sans-serif">Decline</button>'
+      + '</div></div>';
+  });
+  html += '<button onclick="closeTrade()" style="width:100%;margin-top:4px;padding:10px;background:none;border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:Raleway,sans-serif">Close</button>';
+  renderTradePanelContent(html);
+}
+
+function acceptTradeOffer(offerId, offeredServerUid, wantedServerUid) {
+  _supabase.rpc('accept_trade', { offer_id: offerId }).then(function(res) {
+    var data = res.data || {};
+    if (res.error || !data.ok) {
+      toast((data.error || (res.error && res.error.message) || 'Trade failed.'), 'error');
+      _pendingOffers = _pendingOffers.filter(function(o){ return o.id !== offerId; });
+      updateTradeBadge();
+      showIncomingOffers();
+      return;
+    }
+    var incomingData = data.offered_creature;
+    var ourOldCreature = S.roster.find(function(c){ return c.serverUid === wantedServerUid; });
+    if (ourOldCreature && incomingData && incomingData.creature_data) {
+      var idx = S.roster.indexOf(ourOldCreature);
+      var incomingC = incomingData.creature_data;
+      incomingC.serverUid = incomingData.id;
+      incomingC.uid = Date.now() + Math.floor(Math.random() * 1000);
+      incomingC.tradeLockUntil = Date.now() + 48 * 3600 * 1000;
+      S.roster.splice(idx, 1, incomingC);
+    }
+    // Remove given-away creature
+    S.roster = S.roster.filter(function(c){ return c.serverUid !== wantedServerUid; });
+    // Lock the newly received creature
+    var accepted = S.roster.find(function(c){ return incomingData && c.serverUid === incomingData.id; });
+    if (accepted) accepted.tradeLockUntil = Date.now() + 48 * 3600 * 1000;
+    _pendingOffers = _pendingOffers.filter(function(o){ return o.id !== offerId; });
+    updateTradeBadge();
+    autoSave();
+    renderRoster();
+    closeTrade();
+    toast('&#x21C4; Trade complete!', 'capture');
+  });
+}
+
+function rejectTradeOffer(offerId) {
+  _supabase.rpc('reject_trade', { offer_id: offerId }).then(function(res) {
+    _pendingOffers = _pendingOffers.filter(function(o){ return o.id !== offerId; });
+    updateTradeBadge();
+    showIncomingOffers();
+  });
+}
+
+function cancelOutgoingTrade(offerId) {
+  _supabase.rpc('cancel_trade', { offer_id: offerId }).then(function(res) {
+    toast(res.data && res.data.ok ? 'Trade offer cancelled.' : 'Could not cancel offer.');
   });
 }
 
