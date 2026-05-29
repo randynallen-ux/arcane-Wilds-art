@@ -3577,16 +3577,27 @@ function startHunt() {
 function showCaptureCeremony(c, onDone) {
   var overlay = document.getElementById('capture-ceremony');
   if (!overlay) { if (onDone) onDone(); return; }
-  var rc  = RARITIES[c.rarity];
-  var col = c.unique ? c.unique.color : rc.color;
-  var glow = c.unique ? c.unique.glow : rc.glow;
-  document.getElementById('cc-img').innerHTML = creatureImgHtml(c, 80);
+  var rc   = RARITIES[c.rarity];
+  var col  = c.unique ? c.unique.color : rc.color;
+  var glow = c.unique ? c.unique.glow  : rc.glow;
+
+  var imgEl = document.getElementById('cc-img');
+  imgEl.innerHTML = creatureImgHtml(c, 80);
+  imgEl.className = (c.unique && c.unique.prismatic) ? 'prismatic-img' : '';
+
   var rarEl = document.getElementById('cc-rarity');
-  rarEl.textContent = rc.label.toUpperCase();
-  rarEl.style.color = col;
+  if (c.unique) {
+    rarEl.innerHTML = c.unique.prismatic
+      ? '<span class="prismatic-text">\u2726 UNIQUE \u2014 ' + c.unique.name + '</span>'
+      : '<span style="color:' + c.unique.glow + '">\u2726 UNIQUE \u2014 ' + c.unique.name + '</span>';
+  } else {
+    rarEl.innerHTML = '<span style="color:' + col + '">' + rc.label.toUpperCase() + '</span>';
+  }
+
   var nameEl = document.getElementById('cc-name');
   nameEl.textContent = c.name;
   nameEl.style.color = col;
+
   overlay.style.setProperty('--cc-glow', glow || col);
   overlay.classList.add('ceremony-active');
   setTimeout(function() {
@@ -3594,6 +3605,7 @@ function showCaptureCeremony(c, onDone) {
     overlay.classList.add('ceremony-fading');
     setTimeout(function() {
       overlay.classList.remove('ceremony-fading');
+      imgEl.className = '';
       if (onDone) onDone();
     }, 700);
   }, 2300);
@@ -3645,12 +3657,14 @@ function doCapture() {
     var _cap = captured, _rf = rosterFull;
     setTimeout(function(){
       renderHunt();
-      if (_cap.unique) {
-        S.pendingName = _cap.uid;
-        showNameModal(_cap);
-      } else if (_cap.rarity === 'legendary' || _cap.rarity === 'mythic') {
+      if (_cap.unique || _cap.rarity === 'legendary' || _cap.rarity === 'mythic') {
         showCaptureCeremony(_cap, function() {
-          toast(toastCapture(_cap.name, _rf, _cap.bonded) + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+          if (_cap.unique) {
+            S.pendingName = _cap.uid;
+            showNameModal(_cap);
+          } else {
+            toast(toastCapture(_cap.name, _rf, _cap.bonded) + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+          }
         });
       } else if (_cap._firstHunt) {
         toast('✦ ' + _cap.name + ' — documented. The codex has its first entry.', 'capture');
@@ -4961,13 +4975,15 @@ function doApproach() {
     setTimeout(function(){
       renderHunt();
       setTimeout(checkContextualHints, 150);
-      if (_aCap.unique) {
-        S.pendingName = _aCap.uid;
-        showNameModal(_aCap);
-      } else if (_aCap.rarity === 'legendary' || _aCap.rarity === 'mythic') {
-        var _aBond = _aCap.bonded ? ' 🤝 bonded' : '';
+      if (_aCap.unique || _aCap.rarity === 'legendary' || _aCap.rarity === 'mythic') {
         showCaptureCeremony(_aCap, function() {
-          toast('✨ ' + _aCap.name + (_aRf ? ' → Void' : ' captured!') + _aBond + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+          if (_aCap.unique) {
+            S.pendingName = _aCap.uid;
+            showNameModal(_aCap);
+          } else {
+            var _aBond = _aCap.bonded ? ' 🤝 bonded' : '';
+            toast('✨ ' + _aCap.name + (_aRf ? ' → Void' : ' captured!') + _aBond + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+          }
         });
       } else {
         var bondNote = _aCap.bonded ? ' 🤝 bonded' : '';
