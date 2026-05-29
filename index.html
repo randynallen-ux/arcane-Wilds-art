@@ -9320,8 +9320,19 @@ function svgNodeClick(el) {
 function buildSaveData() {
   return {
     avatar: S.avatar, roster: S.roster, void_: S.void_, lures: S.lures, cakes: S.cakes,
-    components: S.components, visited: S.visited, lifetime: S.lifetime, scentMarkers: S.scentMarkers||{}, activeScent: S.activeScent||{}, masteryLog: S.masteryLog||{}, catalysts: S.catalysts||{}, catalystBonus: S.catalystBonus||{}, charmBonuses: S.charmBonuses||{},
+    components: S.components, visited: S.visited, lifetime: S.lifetime,
+    scentMarkers: S.scentMarkers||{}, activeScent: S.activeScent||{}, masteryLog: S.masteryLog||{},
+    catalysts: S.catalysts||{}, catalystBonus: S.catalystBonus||{}, charmBonuses: S.charmBonuses||{},
     story: S.story, discovered: S.discovered, biomeCaptures: S.biomeCaptures, huntStreak: S.huntStreak,
+    fieldNotes: S.fieldNotes||0, essence: S.essence||0,
+    upgrades: S.upgrades||{}, wardenDeals: S.wardenDeals||{},
+    activeRite: S.activeRite||null,
+    rivalContacted: S.rivalContacted||false, rivalIgnored: S.rivalIgnored||false, rivalAllyBonus: S.rivalAllyBonus||false,
+    bestiaryMilestones: S.bestiaryMilestones||{}, bestiaryAttunements: S.bestiaryAttunements||{},
+    wardenGifts: S.wardenGifts||{}, wardenMarks: S.wardenMarks||{},
+    creatureMemory: S.creatureMemory||{},
+    dailySightings: S.dailySightings||{}, weeklyProgress: S.weeklyProgress||{},
+    seenHints: S.seenHints||[],
     activeBiomeId: S.activeBiome ? S.activeBiome.id : null, v: 1
   };
 }
@@ -9510,6 +9521,7 @@ function applyData(data) {
   S.roster      = data.roster      || [];
   S.void_       = data.void_       || [];
   S.components     = data.components    || [];
+  S.cakes          = data.cakes         || [];
   S.scentMarkers   = data.scentMarkers  || {};
   S.masteryLog     = data.masteryLog    || {};
   S.activeScent    = data.activeScent   || {};
@@ -9518,6 +9530,22 @@ function applyData(data) {
   S.charmBonuses   = data.charmBonuses  || {};
   S.visited     = data.visited     || ['verdant_grove'];
   S.lifetime    = data.lifetime    || { total:0, rarities:[] };
+  S.fieldNotes  = data.fieldNotes  || 0;
+  S.essence     = data.essence     || 0;
+  S.upgrades    = data.upgrades    || {};
+  S.wardenDeals = data.wardenDeals || {};
+  S.activeRite  = data.activeRite  || null;
+  S.rivalContacted  = data.rivalContacted  || false;
+  S.rivalIgnored    = data.rivalIgnored    || false;
+  S.rivalAllyBonus  = data.rivalAllyBonus  || false;
+  S.bestiaryMilestones  = data.bestiaryMilestones  || {};
+  S.bestiaryAttunements = data.bestiaryAttunements || {};
+  S.wardenGifts = data.wardenGifts || {};
+  S.wardenMarks = data.wardenMarks || {};
+  S.creatureMemory  = data.creatureMemory  || {};
+  S.dailySightings  = data.dailySightings  || {};
+  S.weeklyProgress  = data.weeklyProgress  || {};
+  S.seenHints       = data.seenHints       || [];
   S.activeBiome = data.activeBiomeId ? (BIOMES.find(function(b){ return b.id===data.activeBiomeId; })||null) : null;
   var stacks = {};
   (data.lures||[]).forEach(function(l) {
