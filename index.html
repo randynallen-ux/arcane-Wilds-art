@@ -7382,6 +7382,28 @@ function buildGoalStrip() {
   return '<div class="hunt-goal-strip">' + parts.join('<span style="color:var(--border)"> · </span>') + '</div>';
 }
 
+function buildHuntIntelBar() {
+  var open = S._huntIntelOpen;
+  var season = getCurrentSeason();
+  var daily = getDailySighting();
+  var dailyDone = isDailyCaptured();
+  var goals = getWeeklyGoals();
+  var goalsDone = goals.filter(function(g){ return g.check(); }).length;
+  var warden = getWardenCall();
+  var chips = [];
+  if (season) chips.push('<span>' + season.emoji + ' ' + season.name + '</span>');
+  if (daily) chips.push('<span style="color:' + (dailyDone ? 'var(--text-muted)' : '#4ade80') + '">' + (dailyDone ? '✓ Daily' : '● Daily') + '</span>');
+  chips.push('<span style="color:' + (goalsDone === goals.length ? '#4ade80' : 'var(--text-muted)') + '">' + goalsDone + '/' + goals.length + ' goals</span>');
+  if (warden) chips.push('<span style="color:#c9a84c">⚑ Warden</span>');
+  return '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:10px">'
+    + '<div onclick="S._huntIntelOpen=!S._huntIntelOpen;renderHunt()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:4px 0;user-select:none;-webkit-tap-highlight-color:transparent">'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--text-muted);align-items:center">' + chips.join('<span style="opacity:0.3"> · </span>') + '</div>'
+    + '<span style="font-size:9px;color:var(--text-muted);letter-spacing:1.5px;white-space:nowrap;flex-shrink:0;margin-left:8px">FIELD INTEL ' + (open ? '▴' : '▾') + '</span>'
+    + '</div>'
+    + (open ? buildSeasonStrip() + buildDailyCard() + buildWardenCard() + buildRivalCard() + buildGoalsCard() : '')
+    + '</div>';
+}
+
 function buildCaptureContextNote(c) {
   // Surface why this capture happened / what helped
   var notes = [];
@@ -8378,15 +8400,10 @@ function renderHunt() {
 
     el.innerHTML = _unlockBanners
       + (isRiteActive() ? '<div class="rite-active-banner"><span style="font-size:20px">✦</span><div>The ' + (KEEPER_RITES.find(function(r){return r.id===S.activeRite.riteId;})||{name:''}).name + ' is active — ' + (S.activeRite.guaranteed ? 'unique encounter guaranteed' : 'unique chance ×' + S.activeRite.multiplier) + ' this hunt</div></div>' : '')
-      + buildSeasonStrip()
-      + buildDailyCard()
-      + buildWardenCard()
-      + buildRivalCard()
-      + buildGoalsCard()
-      + buildGoalStrip()
       + `<div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold);letter-spacing:2px;margin-bottom:2px">WHERE WILL YOU HUNT?</div>`
       + `<div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-bottom:14px">Tap a region to begin an expedition</div>`
-      + `<div class="atlas-page">${_indexHTML}</div>`;
+      + `<div class="atlas-page">${_indexHTML}</div>`
+      + buildHuntIntelBar();
     return;
   }
   const b = S.activeBiome;
@@ -8537,16 +8554,14 @@ function renderHunt() {
     encounterHTML = signHTML + awaitText;
   }
 
-  el.innerHTML = `
+  const _res = calcResonance();
+  const _rl = resonanceLabel(_res);
+  const _streakPill = S.huntStreak > 1
+    ? `<div style="font-size:9px;color:#f97316;white-space:nowrap">🔥 ${S.huntStreak}-streak</div>` : '';
+  const _resPill = _rl
+    ? `<div style="font-size:9px;color:${_rl.color};white-space:nowrap;opacity:0.85">◈ ${_rl.name}</div>` : '';
 
-    ${(function(){
-      var lines = [];
-      if (S.huntStreak > 1) lines.push('<div style="text-align:right;font-size:10px;color:#f97316;margin-bottom:4px">🔥 ' + S.huntStreak + ' capture streak · +' + Math.min(10, S.huntStreak) + '% catch bonus</div>');
-      var res = calcResonance();
-      var rl = resonanceLabel(res);
-      if (rl) lines.push('<div style="text-align:right;font-size:10px;color:' + rl.color + ';margin-bottom:4px;opacity:0.85">◈ ' + rl.name + ' · <span style=\"font-size:9px;opacity:0.7\">' + rl.desc + '</span></div>');
-      return lines.join('');
-    })()}
+  el.innerHTML = `
     <div class="biome-banner" style="--biome-col:${b.color}">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:22px">${b.emoji}</span>
@@ -8555,24 +8570,23 @@ function renderHunt() {
           <div style="font-size:10px;color:var(--text-muted)">${rr.label}+ rarity${masterTier > 0 ? ' &middot; <span style="color:' + tierColors[masterTier] + '">' + tierEmoji[masterTier] + ' ' + tierLabels[masterTier] + '</span>' : ''}</div>
         </div>
       </div>
-      <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="switchTab('hunt');S.activeBiome=null;renderHunt()">Change</button>
-    </div>
-    ${nextTier ? `<div style="margin:8px 0 4px"><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:3px"><span>${tierLabels[(masterTier||0)+1]} in ${Math.max(0,nextTier.captures-masterCaptures)} captures</span><span>${masterCaptures}/${nextTier.captures}</span></div><div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px"><div style="height:100%;width:${Math.min(100,Math.round(masterCaptures/nextTier.captures*100))}%;background:linear-gradient(90deg,#7a6028,${b.color});border-radius:2px"></div></div></div>` : `<div style="font-size:9px;color:#e879f9;margin:6px 0">✦✦✦ Biome Mastered</div>`}
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:10px;color:var(--text-muted);letter-spacing:1px">ROSTER</span>
-      <div class="roster-slots">${slots}</div>
-      <span style="font-size:10px;color:${S.roster.length>=getRosterMax()?'#f97316':'var(--text-muted)'}">${S.roster.length}/${getRosterMax()}</span>
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <div style="flex:1;min-width:140px">
-        <div style="font-size:10px;color:var(--text-muted);letter-spacing:1px;margin-bottom:6px">LURE</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <div class="lure-chip" onclick="S.selectedLure=null;renderHunt()"
-               style="background:${!S.selectedLure?b.color+'22':'rgba(255,255,255,0.04)'};border:1px solid ${!S.selectedLure?b.color:'var(--border)'};color:${!S.selectedLure?b.color:'var(--text-muted)'}">None</div>
-          ${lureChips}
-        </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+        ${_streakPill}${_resPill}
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="switchTab('hunt');S.activeBiome=null;renderHunt()">Change</button>
       </div>
-
+    </div>
+    ${nextTier ? `<div style="height:2px;background:rgba(255,255,255,0.06);border-radius:2px;margin:4px 0 8px"><div style="height:100%;width:${Math.min(100,Math.round(masterCaptures/nextTier.captures*100))}%;background:linear-gradient(90deg,#7a6028,${b.color});border-radius:2px"></div></div>` : `<div style="font-size:9px;color:#e879f9;margin:4px 0 8px">✦✦✦ Biome Mastered</div>`}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        <div class="roster-slots">${slots}</div>
+        <span style="font-size:10px;color:${S.roster.length>=getRosterMax()?'#f97316':'var(--text-muted)'}">${S.roster.length}/${getRosterMax()}</span>
+      </div>
+      <div style="width:1px;height:14px;background:var(--border);flex-shrink:0"></div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;flex:1">
+        <div class="lure-chip" onclick="S.selectedLure=null;renderHunt()"
+             style="background:${!S.selectedLure?b.color+'22':'rgba(255,255,255,0.04)'};border:1px solid ${!S.selectedLure?b.color:'var(--border)'};color:${!S.selectedLure?b.color:'var(--text-muted)'}">None</div>
+        ${lureChips}
+      </div>
     </div>
     <div class="hunt-zone">${encounterHTML}</div>
     <button class="btn btn-primary btn-full" onclick="startHunt()" ${S.hunting?'disabled':''} style="padding:14px;font-size:15px;letter-spacing:1px">
