@@ -9435,6 +9435,7 @@ function openCreatureInspect(uid, fromVoid) {
       + '<div class="stat-row-val">' + val + (isBond ? '<span style="color:' + STAT_COL[k] + ';font-size:8px">' + (c.bondPoints ? ' +'+pts : '↑') + '</span>' : '') + '</div>'
       + '</div>';
   }).join('');
+  var affinityKeys = TYPE_AFFINITY[c.type] || [];
   var affinityLabel = affinityKeys.map(function(s){ return STAT_LABELS[s]; }).join(' + ');
 
   // Memory
@@ -9484,10 +9485,15 @@ function openCreatureInspect(uid, fromVoid) {
     +   '<div class="stat-block">'
     +     '<div class="stat-block-title">Combat Stats</div>'
     +     statRows
-    +     (affinityLabel ? '<div class="affinity-note">🔗 ' + c.type + ' bonds with ' + affinityLabel
-    +       + (c.bonded ? ' <span style="color:#e879f9;font-weight:600">· +20% bonded</span>' : '')
-    +       + (c.unique && c.unique.prismatic ? ' <span style="animation:prismatic-text 3s linear infinite;font-weight:600">· ×2 prismatic</span>' : '')
-    +       + '</div>' : '')
+    +     (function() {
+            if (!c.bonded) return affinityLabel ? '<div class="affinity-note" style="opacity:0.4">Type affinity: ' + affinityLabel + '</div>' : '';
+            var bondParts = c.bondPoints
+              ? Object.keys(c.bondPoints).filter(function(k){ return c.bondPoints[k]>0; }).map(function(k){ return STAT_LABELS[k]+' +'+c.bondPoints[k]; })
+              : (c.bondedStat ? [STAT_LABELS[c.bondedStat]+' +20% (legacy)'] : []);
+            return '<div class="affinity-note">🤝 Bond: ' + (bondParts.join(' · ') || 'no points allocated')
+              + (c.unique && c.unique.prismatic ? ' <span style="animation:prismatic-text 3s linear infinite;font-weight:600">· ×2 prismatic</span>' : '')
+              + '</div>';
+          })()
     +   '</div>'
     + '</div>'
     + '<div class="inspect-actions">' + actBtns + '</div>';
