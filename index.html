@@ -194,7 +194,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .rite-release-hdr{padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
 .rite-release-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px;overflow-y:auto;flex:1}
 .rite-release-card{background:var(--bg3);border:2px solid var(--border);border-radius:12px;padding:10px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;position:relative;-webkit-tap-highlight-color:transparent}
-.rite-release-card.selected{border-color:var(--gold);box-shadow:0 0 12px rgba(201,168,76,0.3)}
+.rite-release-card.selected{border-color:var(--gold);box-shadow:0 0 12px rgba(201,168,76,0.3);background:rgba(201,168,76,0.08)}
 .rite-release-card.blocked{opacity:0.35;cursor:not-allowed}
 .rite-release-check{position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:9px;color:#000;font-weight:700}
 .rite-release-footer{padding:14px 20px calc(env(safe-area-inset-bottom,0px) + 14px);border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0}
@@ -6491,7 +6491,7 @@ function _openRiteRelease(riteId, rite) {
   var rs = {common:1,uncommon:2,rare:3,epic:4,legendary:5,mythic:6};
   var minScore = rs[br.minRarity] || 1;
   var eligible = S.roster.concat(S.void_).filter(function(x){
-    return x.bonded && (rs[x.rarity]||0) >= minScore;
+    return x.bonded && !x.unique && (rs[x.rarity]||0) >= minScore;
   });
   _riteRelease = { riteId: riteId, required: br.count, selected: [], eligible: eligible, rite: rite };
   _renderRiteRelease();
