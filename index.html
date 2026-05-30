@@ -3580,7 +3580,8 @@ function startHunt() {
   renderHunt();
   // Pre-roll the creature so the field sign can reflect it accurately
   const _preRolled = rollCreature(S.activeBiome, lureUsed);
-  const _riteChance = Math.min(0.95, getRiteUniqueChance() + getClassUniqueBonus());
+  const _isGuaranteed = S.activeRite && S.activeRite.guaranteed;
+  const _riteChance = _isGuaranteed ? 1.0 : Math.min(0.95, getRiteUniqueChance() + getClassUniqueBonus());
   const _ritePalettes = getRitePalettePool();
   const _preUnique = Math.random() < _riteChance ? _ritePalettes[Math.floor(Math.random()*_ritePalettes.length)] : null;
   if (isRiteActive()) consumeRite(); // consume after roll regardless of outcome
@@ -6717,10 +6718,10 @@ function _executeRite(riteId, releasedUids) {
   if (c.legendaryComps) consumeComps('legendary', c.legendaryComps);
 
   releasedUids.forEach(function(uid) {
-    var bc = S.roster.concat(S.void_).find(function(x){ return x.uid === uid; });
+    var bc = S.roster.concat(S.void_).find(function(x){ return x.uid == uid; });
     if (!bc) return;
-    S.roster = S.roster.filter(function(x){ return x.uid !== uid; });
-    S.void_  = S.void_.filter(function(x){ return x.uid !== uid; });
+    S.roster = S.roster.filter(function(x){ return x.uid != uid; });
+    S.void_  = S.void_.filter(function(x){ return x.uid != uid; });
     S.components.push(makeComp(bc.type, bc.rarity));
   });
 
