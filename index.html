@@ -1966,16 +1966,27 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
     </div>
     <div style="width:100%;max-width:320px;text-align:center">
       <button id="btn-new-game" class="splash-btn splash-btn-primary">BEGIN NEW EXPEDITION</button>
-      <div class="splash-divider">
-        <div class="splash-divider-line"></div>
-        <div class="splash-divider-text">OR</div>
-        <div class="splash-divider-line"></div>
-      </div>
-      <button id="btn-show-continue" class="splash-btn splash-btn-secondary" onclick="showSplashContinue()" style="border:none">CONTINUE EXPEDITION</button>
-      <div class="splash-save-area" id="splash-save-area" style="display:none">
-        <textarea id="splash-code" rows="3" placeholder="Paste your save code here to continue..." autofocus></textarea>
-        <button id="btn-continue" class="splash-btn splash-btn-secondary" style="border:none">LOAD SAVE</button>
-        <div class="splash-caption">Save codes are generated from the 💾 Save / Load menu in-game</div>
+      <div id="splash-continue-wrap" style="display:none;width:100%">
+        <div class="splash-divider">
+          <div class="splash-divider-line"></div>
+          <div class="splash-divider-text">OR</div>
+          <div class="splash-divider-line"></div>
+        </div>
+        <div id="splash-save-card" style="display:none;background:rgba(201,168,76,0.06);border:1px solid var(--border-warm);border-radius:14px;padding:14px 16px;margin-bottom:10px;text-align:left;align-items:center;gap:12px">
+          <div id="splash-card-avatar" style="width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;border:1px solid var(--border)"></div>
+          <div style="flex:1;min-width:0">
+            <div id="splash-card-name" style="font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+            <div id="splash-card-stats" style="font-size:10px;color:var(--text-muted);margin-top:3px"></div>
+            <div id="splash-card-date" style="font-size:9px;color:var(--text-muted);opacity:0.7;margin-top:2px"></div>
+          </div>
+        </div>
+        <button id="btn-continue-local" class="splash-btn splash-btn-secondary" style="display:none;border:none">CONTINUE EXPEDITION</button>
+        <button id="btn-show-continue" class="splash-btn splash-btn-secondary" onclick="showSplashContinue()" style="border:none">IMPORT SAVE CODE</button>
+        <div class="splash-save-area" id="splash-save-area" style="display:none">
+          <textarea id="splash-code" rows="3" placeholder="Paste your save code here to continue..." autofocus></textarea>
+          <button id="btn-continue" class="splash-btn splash-btn-secondary" style="border:none">LOAD SAVE</button>
+          <div class="splash-caption">Save codes are generated from the 💾 Save / Load menu in-game</div>
+        </div>
       </div>
     </div>
   </div>
@@ -13480,13 +13491,26 @@ function autoSave() {
 function showSplashContinue() {
   var area = document.getElementById('splash-save-area');
   var btn  = document.getElementById('btn-show-continue');
-  if (area) area.style.display = 'flex';
-  if (btn)  btn.style.display  = 'none';
+  if (area) { area.style.display = 'flex'; area.style.flexDirection = 'column'; }
+  if (btn)  btn.style.display = 'none';
   var ta = document.getElementById('splash-code');
   if (ta) setTimeout(function(){ ta.focus(); }, 50);
 }
 
-// Check for existing save and show splash
+function loadLocalSave() {
+  try {
+    var code = localStorage.getItem(SAVE_KEY);
+    if (!code) { toast('No local save found.'); return; }
+    var data = JSON.parse(decodeURIComponent(escape(atob(code))));
+    if (!applyData(data)) throw new Error('invalid');
+    enterGame();
+  } catch(e) {
+    toast('Save could not be loaded.');
+    showSplashContinue();
+  }
+}
+
+// Check for existing save and populate splash card
 // Migrate: copy primary save to slot 0 if slot 0 is empty
 (function() {
   try {
@@ -13497,14 +13521,42 @@ function showSplashContinue() {
   } catch(e) {}
 })();
 (function() {
-  var hasSave = false;
-  try { hasSave = !!localStorage.getItem(SAVE_KEY); } catch(e) {}
-  if (hasSave) {
-    // Pre-fill the save code box so they can just hit Continue
-    try {
-      document.getElementById('splash-code').value = localStorage.getItem(SAVE_KEY);
-    } catch(e) {}
-  }
+  var wrapEl = document.getElementById('splash-continue-wrap');
+  if (wrapEl) wrapEl.style.display = '';
+  try {
+    var code = localStorage.getItem(SAVE_KEY);
+    if (!code) return;
+    var data = JSON.parse(decodeURIComponent(escape(atob(code))));
+    var av = data.avatar || {};
+    var symObj = (typeof AV_SYMBOLS !== 'undefined')
+      ? (AV_SYMBOLS.find(function(s){ return s.id === (av.symbol||'fern'); }) || AV_SYMBOLS[0])
+      : { glyph: '⊛' };
+    var avatarEl = document.getElementById('splash-card-avatar');
+    if (avatarEl) { avatarEl.textContent = symObj.glyph; avatarEl.style.color = av.color || '#7c3aed'; }
+    var nameEl = document.getElementById('splash-card-name');
+    if (nameEl) nameEl.textContent = av.name || 'Explorer';
+    var statsEl = document.getElementById('splash-card-stats');
+    if (statsEl) {
+      var roster = (data.roster||[]).length;
+      var discovered = (data.discovered||[]).length;
+      statsEl.textContent = roster + ' in roster · ' + discovered + ' species discovered';
+    }
+    var dateEl = document.getElementById('splash-card-date');
+    if (dateEl && data.savedAt) {
+      var days = Math.floor((Date.now() - data.savedAt) / 86400000);
+      dateEl.textContent = 'Last played: ' + (days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago');
+    }
+    var cardEl = document.getElementById('splash-save-card');
+    if (cardEl) cardEl.style.display = 'flex';
+    var contBtn = document.getElementById('btn-continue-local');
+    if (contBtn) contBtn.style.display = '';
+    var importBtn = document.getElementById('btn-show-continue');
+    if (importBtn) {
+      importBtn.className = '';
+      importBtn.style.cssText = 'background:none;border:none;color:var(--text-muted);font-size:10px;font-family:Raleway,sans-serif;cursor:pointer;text-decoration:underline;padding:6px 0;display:block;width:100%;text-align:center;margin-top:2px';
+      importBtn.textContent = '↩ Import from save code';
+    }
+  } catch(e) {}
 })();
 
 // ── Critical button event listeners ──
@@ -13513,6 +13565,8 @@ function bindButtons() {
   if (jsTest) setTimeout(function(){ jsTest.style.display='none'; }, 3000);
   var btnNew = document.getElementById('btn-new-game');
   if (btnNew) { btnNew.onclick = startNewGame; btnNew.addEventListener('click', startNewGame); }
+  var btnContLocal = document.getElementById('btn-continue-local');
+  if (btnContLocal) { btnContLocal.onclick = loadLocalSave; btnContLocal.addEventListener('click', loadLocalSave); }
   var btnCont = document.getElementById('btn-continue');
   if (btnCont) { btnCont.onclick = loadFromSplash; btnCont.addEventListener('click', loadFromSplash); }
   var btnAvatar = document.getElementById('btn-confirm-avatar');
