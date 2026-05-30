@@ -8679,6 +8679,7 @@ function menuToggleNarration() {
   if (!_narrationEnabled) stopNarration();
   setToggleBtn('menu-narration-btn', _narrationEnabled);
   updateNarrationBtn();
+  try{ localStorage.setItem('wilds-narration', _narrationEnabled?'1':'0'); }catch(e){}
 }
 
 function confirmReturnToMenu() {
@@ -12325,7 +12326,11 @@ function _showNextLetter() {
   document.getElementById('letter-inner').scrollTop = 0;
   panel.classList.add('open');
   sfxLetterOpen();
-  // Narration fires when typewriter finishes (user can also tap 🎙)
+  // Show speak button so player can replay at any time
+  var spkBtnOpen = document.getElementById('letter-speak-btn');
+  if (spkBtnOpen) spkBtnOpen.style.display = 'block';
+  // Auto-narrate if enabled
+  if (_narrationEnabled) narrateEntry(e);
 
   // HTML typewriter with markdown
   var body   = processStoryBody(e.body);
@@ -13420,7 +13425,7 @@ function updateAudioBtn() {
 // NARRATION — Web Speech API
 // ═══════════════════════════════════════════════════════════════════════════
 
-var _narrationEnabled = false;
+var _narrationEnabled = (function(){ try{ var v=localStorage.getItem('wilds-narration'); return v==='1'; }catch(e){ return false; } })();
 var _currentUtterance = null;
 var _voicesLoaded = false;
 var _voiceCache = {};
