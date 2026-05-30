@@ -198,6 +198,9 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .rite-release-card.blocked{opacity:0.35;cursor:not-allowed}
 .rite-release-check{position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:9px;color:#000;font-weight:700}
 .rite-release-footer{padding:14px 20px calc(env(safe-area-inset-bottom,0px) + 14px);border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0}
+.bsm-stat-btn{background:var(--bg3);border:2px solid var(--border);border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;transition:border-color .15s,background .15s;-webkit-tap-highlight-color:transparent;width:100%}
+.bsm-stat-btn:active{border-color:var(--sc,var(--border));background:rgba(255,255,255,0.06)}
+.bsm-stat-btn.recommended{border-color:rgba(201,168,76,0.35);background:rgba(201,168,76,0.04)}
 
 /* AVATAR CREATION */
 #avatar-create{position:fixed;inset:0;background:var(--bg);z-index:790;display:none;flex-direction:column;align-items:center;padding:32px 24px;overflow-y:auto}
@@ -2181,6 +2184,11 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
     </div>
   </div>
 
+  <!-- BOND STAT MODAL -->
+  <div id="bond-stat-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:720;display:none;align-items:flex-end;justify-content:center">
+    <div id="bond-stat-inner" style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden"></div>
+  </div>
+
   <!-- FIELD NOTE MODAL -->
   <div id="field-note-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:750;align-items:flex-end;justify-content:center;padding:0">
     <div id="field-note-inner" style="background:#f0e8d0;border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;position:relative">
@@ -3302,15 +3310,13 @@ function rollCreature(biome, lure, dailyBoostId) {
 
 function creatureStats(c) {
   const mult = c.unique && c.unique.prismatic ? 2.0 : c.unique ? 1.25 : 1;
-  const affinity = TYPE_AFFINITY[c.type] || [];
+  // bondedStat: player-chosen key; legacy saves fall back to first type affinity
+  const bondStat = c.bonded ? (c.bondedStat || (TYPE_AFFINITY[c.type] || [])[0] || null) : null;
   const s = {};
   Object.keys(c.stats).forEach(k => {
     const base = c.stats[k] * mult;
-    if (c.bonded && affinity.includes(k)) {
-      // Bond bonus: +20%, but always at least +1 stat point above the unbonded value
-      const unbonded = Math.round(base);
-      const bonded = Math.max(unbonded + 1, Math.round(base * 1.20));
-      s[k] = bonded;
+    if (bondStat === k) {
+      s[k] = Math.max(Math.round(base) + 1, Math.round(base * 1.20));
     } else {
       s[k] = Math.round(base);
     }
@@ -4328,21 +4334,24 @@ function applyUniqueName() {
   var inp = document.getElementById('unique-name-input');
   var name = inp ? inp.value.trim() : '';
   if (!name) { if(inp) inp.style.borderColor='#f87171'; return; }
-  var c = S.roster.find(function(x){ return x.uid == S.pendingName; });
+  var pendingUid = S.pendingName;
+  var c = S.roster.find(function(x){ return x.uid == pendingUid; });
   if (c) { c.uniqueName = name; }
   S.pendingName = null;
   document.getElementById('name-modal').style.display = 'none';
-  var named = S.roster.find(function(x){ return x.uniqueName === name; });
-  toast('✨ Named: ' + (named ? named.name + ' — ' + name : name));
+  toast('✨ Named: ' + (c ? c.name + ' — ' + name : name));
   renderRoster();
   autoSave();
+  if (c && c.bonded && !c.bondedStat) setTimeout(function(){ openBondStatModal(c); }, 400);
 }
 
 function skipUniqueName() {
+  var pendingUid = S.pendingName;
   S.pendingName = null;
   document.getElementById('name-modal').style.display = 'none';
-  var c = S.roster.find(function(x){ return x.uid == S.pendingName; });
+  var c = S.roster.find(function(x){ return x.uid == pendingUid; });
   toast('✨ Unique ' + (c ? c.name : 'creature') + ' captured!');
+  if (c && c.bonded && !c.bondedStat) setTimeout(function(){ openBondStatModal(c); }, 400);
 }
 
 
@@ -5022,14 +5031,17 @@ function doApproach() {
           if (_aCap.unique) {
             S.pendingName = _aCap.uid;
             showNameModal(_aCap);
+            // bond stat modal fires from confirmUniqueName / skipUniqueName if bonded
           } else {
-            var _aBond = _aCap.bonded ? ' 🤝 bonded' : '';
+            var _aBond = _aCap.bonded ? ' 🤝' : '';
             toast('✨ ' + _aCap.name + (_aRf ? ' → Void' : ' captured!') + _aBond + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+            if (_aCap.bonded) setTimeout(function(){ openBondStatModal(_aCap); }, 700);
           }
         });
       } else {
-        var bondNote = _aCap.bonded ? ' 🤝 bonded' : '';
+        var bondNote = _aCap.bonded ? ' 🤝' : '';
         toast('✨ ' + _aCap.name + (_aRf ? ' → Void' : ' captured!') + bondNote + (S.huntStreak > 1 ? ' 🔥 ' + S.huntStreak + ' streak' : ''), 'capture');
+        if (_aCap.bonded) setTimeout(function(){ openBondStatModal(_aCap); }, 700);
       }
     }, 620);
   } else {
@@ -6536,6 +6548,58 @@ function _toggleRiteRelease(uid) {
 function closeRiteRelease() {
   document.getElementById('rite-release-modal').style.display = 'none';
   _riteRelease = { riteId: null, required: 0, selected: [], eligible: [], rite: null };
+}
+
+var _bsmUid = null;
+
+function openBondStatModal(c) {
+  _bsmUid = c.uid;
+  var STAT_LABELS = { hp:'HP', atk:'ATK', def:'DEF', spd:'SPD', mana:'MANA' };
+  var STAT_COL   = { hp:'#f87171', atk:'#f97316', def:'#60a5fa', spd:'#4ade80', mana:'#e879f9' };
+  var STAT_DESC  = { hp:'Durability and staying power', atk:'Offensive strength', def:'Resistance to threats', spd:'Agility and reaction time', mana:'Arcane and elemental force' };
+  var mult = c.unique && c.unique.prismatic ? 2.0 : c.unique ? 1.25 : 1;
+  var affinity = TYPE_AFFINITY[c.type] || [];
+  var src = speciesArtSrc(c.id);
+  var imgFilter = _uniqueImgFilter(c.unique);
+  var portrait = src
+    ? '<div style="width:52px;height:52px;border-radius:10px;overflow:hidden;flex-shrink:0"><img src="' + src + '" style="width:100%;height:100%;object-fit:cover' + (imgFilter ? ';filter:' + imgFilter : '') + '"></div>'
+    : '<span style="font-size:36px;flex-shrink:0">' + c.emoji + '</span>';
+  var btns = ['hp','atk','def','spd','mana'].map(function(k) {
+    var base = Math.round((c.stats[k] || 0) * mult);
+    var boosted = Math.max(base + 1, Math.round(base * 1.20));
+    var isRec = affinity.indexOf(k) >= 0;
+    return '<button class="bsm-stat-btn' + (isRec ? ' recommended' : '') + '" onclick="confirmBondStat(\'' + k + '\')" style="--sc:' + STAT_COL[k] + '">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+      + '<span style="font-size:12px;font-weight:700;color:' + STAT_COL[k] + ';font-family:Cinzel,serif">' + STAT_LABELS[k] + (isRec ? ' <span style="font-size:9px;color:var(--gold);font-family:Raleway,sans-serif">★ suggested</span>' : '') + '</span>'
+      + '<span style="font-size:12px;color:var(--text-muted)">' + base + ' <span style="color:' + STAT_COL[k] + ';font-weight:700">→ ' + boosted + '</span></span>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted)">' + STAT_DESC[k] + '</div>'
+      + '</button>';
+  }).join('');
+  var defaultStat = affinity[0] || 'hp';
+  document.getElementById('bond-stat-inner').innerHTML =
+    '<div style="padding:20px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0">'
+    + '<div style="display:flex;align-items:center;gap:12px">'
+    + portrait
+    + '<div><div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">Bond Enhancement</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + c.name + ' — choose one stat to strengthen by +20%</div></div>'
+    + '</div></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px;overflow-y:auto;flex:1">' + btns + '</div>'
+    + '<div style="padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 10px);border-top:1px solid var(--border);flex-shrink:0">'
+    + '<button onclick="confirmBondStat(\'' + defaultStat + '\')" style="background:none;border:none;color:var(--text-muted);font-size:10px;font-family:Raleway,sans-serif;cursor:pointer;text-decoration:underline;width:100%;padding:4px">Use suggested (' + STAT_LABELS[defaultStat] + ')</button>'
+    + '</div>';
+  document.getElementById('bond-stat-modal').style.display = 'flex';
+}
+
+function confirmBondStat(statKey) {
+  if (!_bsmUid) return;
+  var c = S.roster.concat(S.void_).find(function(x){ return x.uid === _bsmUid; });
+  if (c) c.bondedStat = statKey;
+  _bsmUid = null;
+  document.getElementById('bond-stat-modal').style.display = 'none';
+  autoSave();
+  var STAT_LABELS = { hp:'HP', atk:'ATK', def:'DEF', spd:'SPD', mana:'MANA' };
+  toast('🤝 ' + (c ? c.name : 'Bond') + ': ' + STAT_LABELS[statKey] + ' +20%');
 }
 
 function confirmRiteRelease() {
@@ -8607,24 +8671,24 @@ function creatureCard(c, selectedKey, fromVoid) {
   const STAT_COL = { hp:'#f87171', atk:'#f97316', def:'#60a5fa', spd:'#4ade80', mana:'#e879f9' };
   const STAT_LABELS = { hp:'HP', atk:'ATK', def:'DEF', spd:'SPD', mana:'MANA' };
   const cs = creatureStats(c);
+  const _bondStat = c.bonded ? (c.bondedStat || (TYPE_AFFINITY[c.type] || [])[0] || null) : null;
   const statRows = Object.keys(cs).map(function(k) {
     const val = cs[k];
     const pct = Math.min(100, Math.round((val / STAT_MAX[k]) * 100));
-    const isAffinity = (TYPE_AFFINITY[c.type] || []).includes(k);
+    const isBonded = _bondStat === k;
     return `<div class="stat-row">
-      <div class="stat-row-label" style="color:${isAffinity ? STAT_COL[k] : ''}">${STAT_LABELS[k]}</div>
+      <div class="stat-row-label" style="color:${isBonded ? STAT_COL[k] : ''}">${STAT_LABELS[k]}</div>
       <div class="stat-row-bar">
-        <div class="stat-row-fill" style="width:${pct}%;background:${STAT_COL[k]};opacity:${isAffinity?1:0.55}"></div>
+        <div class="stat-row-fill" style="width:${pct}%;background:${STAT_COL[k]};opacity:${isBonded?1:0.55}"></div>
       </div>
-      <div class="stat-row-val">${val}${isAffinity ? '<span style="color:'+STAT_COL[k]+';font-size:8px">↑</span>' : ''}</div>
+      <div class="stat-row-val">${val}${isBonded ? '<span style="color:'+STAT_COL[k]+';font-size:8px">↑</span>' : ''}</div>
     </div>`;
   }).join('');
 
-  const affinityStats = (TYPE_AFFINITY[c.type] || []).map(s => STAT_LABELS[s]).join(' + ');
   const statBlock = `<div class="stat-block">
     <div class="stat-block-title">Combat Stats</div>
     ${statRows}
-    ${affinityStats ? `<div class="affinity-note">🔗 ${c.type} bonds with ${affinityStats}${c.bonded ? ' <span style="color:#e879f9;font-weight:600">· +20% bonded</span>' : ''}${c.unique && c.unique.prismatic ? ' <span style="animation:prismatic-text 3s linear infinite;font-weight:600">· ×2 prismatic</span>' : ''}</div>` : ''}
+    ${_bondStat ? `<div class="affinity-note">🤝 Bond: ${STAT_LABELS[_bondStat]} +20%${c.unique && c.unique.prismatic ? ' <span style="animation:prismatic-text 3s linear infinite;font-weight:600">· ×2 prismatic</span>' : ''}</div>` : `<div class="affinity-note" style="opacity:0.5">Type affinity: ${(TYPE_AFFINITY[c.type]||[]).map(s=>STAT_LABELS[s]).join(' + ')}${c.unique && c.unique.prismatic ? ' · ×2 prismatic' : ''}</div>`}
   </div>`;
 
   // ── Bond badge ───────────────────────────────────────────────────────
@@ -9328,15 +9392,15 @@ function openCreatureInspect(uid, fromVoid) {
   var STAT_COL = {hp:'#f87171',atk:'#f97316',def:'#60a5fa',spd:'#4ade80',mana:'#e879f9'};
   var STAT_LABELS = {hp:'HP',atk:'ATK',def:'DEF',spd:'SPD',mana:'MANA'};
   var cs = creatureStats(c);
-  var affinityKeys = TYPE_AFFINITY[c.type] || [];
+  var _bs = c.bonded ? (c.bondedStat || (TYPE_AFFINITY[c.type] || [])[0] || null) : null;
   var statRows = Object.keys(cs).map(function(k) {
     var val = cs[k];
     var pct = Math.min(100, Math.round((val / STAT_MAX[k]) * 100));
-    var isAff = affinityKeys.indexOf(k) >= 0;
+    var isBond = _bs === k;
     return '<div class="stat-row">'
-      + '<div class="stat-row-label" style="color:' + (isAff ? STAT_COL[k] : '') + '">' + STAT_LABELS[k] + '</div>'
-      + '<div class="stat-row-bar"><div class="stat-row-fill" style="width:' + pct + '%;background:' + STAT_COL[k] + ';opacity:' + (isAff ? 1 : 0.55) + '"></div></div>'
-      + '<div class="stat-row-val">' + val + (isAff ? '<span style="color:' + STAT_COL[k] + ';font-size:8px">↑</span>' : '') + '</div>'
+      + '<div class="stat-row-label" style="color:' + (isBond ? STAT_COL[k] : '') + '">' + STAT_LABELS[k] + '</div>'
+      + '<div class="stat-row-bar"><div class="stat-row-fill" style="width:' + pct + '%;background:' + STAT_COL[k] + ';opacity:' + (isBond ? 1 : 0.55) + '"></div></div>'
+      + '<div class="stat-row-val">' + val + (isBond ? '<span style="color:' + STAT_COL[k] + ';font-size:8px">↑</span>' : '') + '</div>'
       + '</div>';
   }).join('');
   var affinityLabel = affinityKeys.map(function(s){ return STAT_LABELS[s]; }).join(' + ');
