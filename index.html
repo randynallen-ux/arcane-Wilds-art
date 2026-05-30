@@ -2077,7 +2077,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
     <div class="av-section" style="animation-delay:.24s">
       <div class="av-label">EXPLORER TITLE</div>
       <div class="av-grid" id="av-title-grid" style="grid-template-columns:repeat(2,1fr)"></div>
-      <div class="av-class-ability" id="class-ability-preview">Select a title to see your starting abilities.</div>
+      <div class="av-class-ability" id="class-ability-preview">Select a title to learn about your approach.</div>
     </div>
 
     <!-- Journal Tone -->
@@ -7379,6 +7379,7 @@ const CLASS_TREES = {
   naturalist: {
     label: 'Field Naturalist',
     tagline: 'The methodical observer. Everything yields to patient documentation.',
+    lore: 'The Field Naturalist accumulates data where others would accumulate anxieties. They document first and ask questions later — not because they lack curiosity, but because documentation itself is a form of understanding. Patience is not a virtue to them so much as a methodology.',
     t1:  { id:'nrt_rhythm',    name:"Nature's Rhythm",   desc:'Patience timer does not begin until your first approach.' },
     t2a: { id:'nrt_steady',    name:'Steady Hand',        desc:'+5% base catch rate on all creatures.' },
     t2b: { id:'nrt_patient',   name:'Patient Eye',        desc:'Patience drains 25% slower.' },
@@ -7390,6 +7391,7 @@ const CLASS_TREES = {
   scholar: {
     label: 'Runic Scholar',
     tagline: 'Knowledge applied at the moment of encounter.',
+    lore: 'The Runic Scholar does not observe creatures so much as cross-reference them. Every encounter is an entry in a mental index that grows more useful the longer it exists. They arrive at a scene knowing things they have not yet confirmed, and leave knowing things they cannot yet explain.',
     t1:  { id:'sch_eye',       name:'Studied Eye',        desc:'Creature rarity is always visible, even without Keen Eye.' },
     t2a: { id:'sch_archive',   name:'Archive Method',     desc:'Bond persistence +5% per failed attempt (stacks with other bonuses).' },
     t2b: { id:'sch_crossref',  name:'Cross-Reference',    desc:'Field notes earned are worth +1 each.' },
@@ -7401,6 +7403,7 @@ const CLASS_TREES = {
   hunter: {
     label: 'Wandering Hunter',
     tagline: 'Movement, instinct, and pressure.',
+    lore: 'The Wandering Hunter moves through the wilds as a creature of the wilds — not a visitor. They respond to things they have not consciously noticed and act on instincts they have earned rather than inherited. The field, to them, is less a place of study than a place of ongoing negotiation.',
     t1:  { id:'hnt_edge',      name:"Predator's Edge",    desc:'Stalk costs no attempt on distracted creatures (no upgrade needed).' },
     t2a: { id:'hnt_streak',    name:'Streak Instinct',    desc:'Hunt streak catch bonus doubles (+4% per capture, max +40%).' },
     t2b: { id:'hnt_first',     name:'First Blood',        desc:'First approach each encounter costs no attempt.' },
@@ -7412,6 +7415,7 @@ const CLASS_TREES = {
   cartographer: {
     label: 'Void Cartographer',
     tagline: 'The collector. Nothing is wasted; everything is catalogued.',
+    lore: 'The Void Cartographer makes maps of things that do not stay still. They are less interested in what exists at a given moment than in what has existed, might exist, and will probably exist again in a slightly different form. They are methodical cataloguers of change.',
     t1:  { id:'crt_archive',   name:'Deep Archive',       desc:'Void capacity +10 from the start.' },
     t2a: { id:'crt_release',   name:'Clean Release',      desc:'Releasing a creature always yields 2 components instead of 1.' },
     t2b: { id:'crt_survey',    name:'Survey Eye',         desc:'Hidden biome unlock requirements reduced by 3 captures.' },
@@ -7423,6 +7427,7 @@ const CLASS_TREES = {
   stormcaller: {
     label: 'Storm Caller',
     tagline: 'Reads the elemental currents others miss.',
+    lore: 'The Storm Caller feels the field the way barometers feel pressure — not by measuring it, but by being part of it. They are drawn to volatile species, turbulent biomes, and encounters that other naturalists would step away from. What looks like recklessness is an extremely refined sensitivity.',
     t1:  { id:'stm_affinity',  name:'Storm Affinity',     desc:'Ember and aqua catch rates +5% each.' },
     t2a: { id:'stm_fireproof', name:'Fireproof',          desc:'Ember singe fightback never triggers.' },
     t2b: { id:'stm_tidal',     name:'Tidal Pull',         desc:'Ember and aqua creatures appear 20% more often in mixed biomes.' },
@@ -7434,6 +7439,7 @@ const CLASS_TREES = {
   grovekeeper: {
     label: 'Grove Keeper',
     tagline: 'The ancient relationship between naturalist and grove.',
+    lore: 'The Grove Keeper practices a naturalism that is not entirely a science. There is something older in their relationship with flora and celestial creatures — a mutual attention that predates documentation. What they give back to the wilds, no one has fully catalogued.',
     t1:  { id:'grv_bond',      name:'Grove Bond',         desc:'Flora and celestial catch rates +5% each.' },
     t2a: { id:'grv_roots',     name:'Deep Roots',         desc:'Patient Observer upgrade effect is doubled — each level adds +6s instead of +3s.' },
     t2b: { id:'grv_timing',    name:'Ancient Timing',     desc:'Flora and celestial patience drains 25% slower.' },
@@ -10167,11 +10173,9 @@ function showClassAbilityPreview(key) {
   var ab = CLASS_TREES[key];
   var preview = document.getElementById('class-ability-preview');
   if (!preview || !ab) return;
-  var t1 = ab.t1 ? '<div style="margin-bottom:4px"><strong>' + ab.t1.name + '</strong> (Base) — ' + ab.t1.desc + '</div>' : '';
-  var t2 = (ab.t2a || ab.t2b) ? '<div style="margin-bottom:4px;color:var(--text-muted);font-size:10px;letter-spacing:1px">TIER II — pick one on first specialization</div>' : '';
-  if (ab.t2a) t2 += '<div style="margin-bottom:4px"><strong>' + ab.t2a.name + '</strong> — ' + ab.t2a.desc + '</div>';
-  if (ab.t2b) t2 += '<div style="margin-bottom:4px"><strong>' + ab.t2b.name + '</strong> — ' + ab.t2b.desc + '</div>';
-  preview.innerHTML = '<div class="class-ability-header">' + ab.label + ' — ' + ab.tagline + '</div>' + t1 + t2;
+  preview.innerHTML = '<div class="class-ability-header">' + ab.label.toUpperCase() + '</div>'
+    + '<div style="margin-bottom:6px;font-style:normal;color:var(--gold-dim);font-size:10px">' + ab.tagline + '</div>'
+    + (ab.lore ? '<div>' + ab.lore + '</div>' : '');
 }
 
 function selectAvTone(el, hex, name) {
