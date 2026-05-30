@@ -3629,6 +3629,7 @@ function selectBiome(b) {
 
 function startHunt() {
   if (S.hunting || !S.activeBiome) return;
+  sfxHunt();
   S.hunting = true; S.encounter = null; S.captureResult = null;
   // Start type-coloured search animation
   if (S.pendingEncounter) startHuntSearchAnim(S.pendingEncounter.type);
@@ -3709,6 +3710,7 @@ function startHunt() {
     renderHunt();
     startPatienceTimer(c);
     encounterAmbienceSwell();
+    sfxEncounter();
     setTimeout(function(){ playCreatureEmergence(c); }, 40);
     setTimeout(function(){ updateHuntZoneType(c.type, c.unique ? c.unique.glow : null); }, 20);
     setTimeout(function(){ FX.encounter(c.type, !!S.encounter.unique, c.id === 'formless'); }, 80);
@@ -3883,6 +3885,7 @@ function sendToVoid(uid) {
   else if (S.tab === 'hunt') renderHunt();
   if (S.tab === 'void') renderVoid();
   renderPassiveStats();
+  sfxVoidSend();
   toast(c.name + ' sent to the Void.');  autoSave();
 }
 
@@ -3897,6 +3900,7 @@ function recallFromVoid(uid) {
   else if (S.tab === 'hunt') renderHunt();
   if (S.tab === 'void') renderVoid();
   renderPassiveStats();
+  sfxVoidRecall();
   toast(c.name + ' recalled.', 'success');  autoSave();
 }
 
@@ -4911,6 +4915,7 @@ var _patienceTimer = null;
 var _patienceStart = null;
 var _patienceDuration = 0;
 var _patienceFrozen = false;
+var _patienceWarnPlayed = false;
 var _firstApproachUsed = false;
 
 function startPatienceTimer(creature) {
@@ -4926,6 +4931,7 @@ function startPatienceTimer(creature) {
   _patienceDuration = (((STATE_PATIENCE[creature.rarity] || 12000) + getPatientObserverBonus() * _classPatienceMult + getChoicePatienceBonus() + _abilityPatBonus + _wardenPatBonus) * (1 + _ancientTimingBonus) + _oldGrowthBonus) * _abilityPatMult * _patientEyeMult;
   S.encounterState = assignInitialState(creature);
   S.patiencePct = 100;
+  _patienceWarnPlayed = false;
   _patienceFrozen = hasClassAbility('nrt_rhythm');
 
   _patienceTimer = setInterval(function() {
@@ -4934,6 +4940,7 @@ function startPatienceTimer(creature) {
     var elapsed = Date.now() - _patienceStart;
     var pct = Math.max(0, 100 - (elapsed / _patienceDuration) * 100);
     S.patiencePct = pct;
+    if (pct < 25 && !_patienceWarnPlayed) { _patienceWarnPlayed = true; sfxPatienceUrgent(); }
     checkContextualHints();
     var newState = stateFromPatience(pct, S.encounterState);
 
@@ -5669,6 +5676,7 @@ function _spawnIntroStars() {
 
 // ─── CRAFT RESULT REVEAL ─────────────────────────────────────────────────
 function showCraftResult(icon, name, desc) {
+  sfxCraft();
   // Remove any existing
   var existing = document.getElementById('craft-result-overlay');
   if (existing) existing.remove();
@@ -6802,6 +6810,7 @@ function confirmBondStat() {
   if (c) { c.bondPoints = Object.assign({}, _bsmAlloc); delete c.bondedStat; }
   _bsmUid = null;
   document.getElementById('bond-stat-modal').style.display = 'none';
+  sfxBond();
   autoSave();
   var used = Object.keys(_bsmAlloc).reduce(function(s,k){ return s + (_bsmAlloc[k]||0); }, 0);
   toast('🤝 ' + (c ? c.name : 'Bond') + ': ' + used + ' point' + (used!==1?'s':'') + ' allocated');
@@ -6862,6 +6871,7 @@ function _executeRite(riteId, releasedUids) {
     guaranteed: !!rite.guaranteedUnique,
   };
 
+  sfxRite();
   earnAttunement(6, 'rite completed');
   autoSave();
   renderCraft();
@@ -7557,6 +7567,7 @@ function earnAttunement(amount, reason) {
   if (newLevel > prevLevel) {
     setTimeout(function() {
       toast('✦ Attunement Level ' + newLevel + '! New specialization available.', 'levelup');
+      sfxLevelUp();
       renderPassiveStats();
     }, 800);
   }
@@ -7594,6 +7605,7 @@ function unlockClassTier(tier, choice) {
     toast('🔄 Specialization switched. −' + cost + ' Attunement.');
   }
   u[tier] = choice;
+  sfxClassUnlock();
   autoSave();
   renderPassiveStats();
 }
@@ -8617,7 +8629,6 @@ function doDeepRequest(key) {
 }
 
 // ── OPTIONS MENU ──────────────────────────────────────────────────────────
-var _sfxEnabled = true;
 
 function openMenu() {
   updateMenuToggles();
@@ -8653,12 +8664,14 @@ function menuToggleMusic() {
     if (S.activeBiome) playBiomeMusic(S.activeBiome.id);
   }
   setToggleBtn('menu-music-btn', _audioEnabled);
+  try{ localStorage.setItem('wilds-audio-music', _audioEnabled?'1':'0'); }catch(e){}
 }
 
 function menuToggleSfx() {
   _sfxEnabled = !_sfxEnabled;
   if (_sfxGain) _sfxGain.gain.value = _sfxEnabled ? _sfxVol : 0;
   setToggleBtn('menu-sfx-btn', _sfxEnabled);
+  try{ localStorage.setItem('wilds-audio-sfx', _sfxEnabled?'1':'0'); }catch(e){}
 }
 
 function menuToggleNarration() {
@@ -12596,11 +12609,12 @@ var _musicGain   = null;
 var _sfxGain     = null;
 var _currentTrack = null;   // { nodes:[], stop:fn }
 var _currentBiomeId = null;
-var _audioEnabled = true;
+var _audioEnabled = (function(){ try{ var v=localStorage.getItem('wilds-audio-music'); return v===null?true:v==='1'; }catch(e){ return true; } })();
 var _musicVol = 0.45;
 var _sfxVol   = 0.7;
 var _atlasDroneNodes = [];
 var _encounterTensionNodes = [];
+var _sfxEnabled = (function(){ try{ var v=localStorage.getItem('wilds-audio-sfx'); return v===null?true:v==='1'; }catch(e){ return true; } })();
 
 function getAudioCtx() {
   if (!_audioCtx) {
@@ -13179,14 +13193,125 @@ function sfxCapture() {
 
 function sfxEncounter() {
   if (!_audioEnabled || !_sfxEnabled) return;
-  var ctx = getAudioCtx();
-  // Soft stab
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  // Two-layer: low sine pulse + soft triangle ping
+  var o1=ctx.createOscillator(); var g1=ctx.createGain();
+  o1.type='sine'; o1.frequency.value=110;
+  g1.gain.setValueAtTime(0,t); g1.gain.linearRampToValueAtTime(0.12,t+0.03);
+  g1.gain.exponentialRampToValueAtTime(0.0001,t+0.55);
+  o1.connect(g1); g1.connect(_sfxGain); o1.start(t); o1.stop(t+0.6);
+  var o2=ctx.createOscillator(); var g2=ctx.createGain();
+  o2.type='triangle'; o2.frequency.value=330;
+  g2.gain.setValueAtTime(0,t+0.02); g2.gain.linearRampToValueAtTime(0.07,t+0.06);
+  g2.gain.exponentialRampToValueAtTime(0.0001,t+0.5);
+  o2.connect(g2); g2.connect(_sfxGain); o2.start(t+0.02); o2.stop(t+0.55);
+}
+
+function sfxHunt() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
   var o=ctx.createOscillator(); var g=ctx.createGain();
-  o.type='triangle'; o.frequency.value=220;
-  g.gain.setValueAtTime(0.08,ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.4);
-  o.connect(g); g.connect(_sfxGain);
-  o.start(); o.stop(ctx.currentTime+0.5);
+  o.type='sine'; o.frequency.value=440;
+  g.gain.setValueAtTime(0.06,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
+  o.connect(g); g.connect(_sfxGain); o.start(t); o.stop(t+0.2);
+}
+
+function sfxPatienceUrgent() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  // Three quick soft pulses — tense but not alarming
+  [0, 0.18, 0.36].forEach(function(delay) {
+    var o=ctx.createOscillator(); var g=ctx.createGain();
+    o.type='triangle'; o.frequency.value=280;
+    g.gain.setValueAtTime(0,t+delay); g.gain.linearRampToValueAtTime(0.09,t+delay+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+delay+0.12);
+    o.connect(g); g.connect(_sfxGain); o.start(t+delay); o.stop(t+delay+0.15);
+  });
+}
+
+function sfxBond() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  // Warm major chord bloom — C4, E4, G4
+  [[261.6,0],[329.6,0.04],[392,0.09]].forEach(function(pair) {
+    var o=ctx.createOscillator(); var g=ctx.createGain();
+    o.type='sine'; o.frequency.value=pair[0];
+    g.gain.setValueAtTime(0,t+pair[1]); g.gain.linearRampToValueAtTime(0.09,t+pair[1]+0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+pair[1]+0.9);
+    o.connect(g); g.connect(_sfxGain); o.start(t+pair[1]); o.stop(t+pair[1]+1.0);
+  });
+}
+
+function sfxVoidSend() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  var o=ctx.createOscillator(); var g=ctx.createGain();
+  var f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=600;
+  o.type='sine'; o.frequency.setValueAtTime(300,t); o.frequency.exponentialRampToValueAtTime(80,t+0.4);
+  g.gain.setValueAtTime(0.1,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.45);
+  o.connect(f); f.connect(g); g.connect(_sfxGain); o.start(t); o.stop(t+0.5);
+}
+
+function sfxVoidRecall() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  var o=ctx.createOscillator(); var g=ctx.createGain();
+  o.type='triangle'; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(440,t+0.3);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.1,t+0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.38);
+  o.connect(g); g.connect(_sfxGain); o.start(t); o.stop(t+0.4);
+}
+
+function sfxCraft() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  // Two-note click: low tap then bright ping
+  [[200,0,0.08],[523,0.07,0.06]].forEach(function(p) {
+    var o=ctx.createOscillator(); var g=ctx.createGain();
+    o.type='triangle'; o.frequency.value=p[0];
+    g.gain.setValueAtTime(p[2],t+p[1]); g.gain.exponentialRampToValueAtTime(0.0001,t+p[1]+0.22);
+    o.connect(g); g.connect(_sfxGain); o.start(t+p[1]); o.stop(t+p[1]+0.25);
+  });
+}
+
+function sfxRite() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  // Deep resonant chord + shimmer
+  [[55,0,0.14,'sine'],[110,0.05,0.1,'sine'],[220,0.1,0.07,'triangle'],[440,0.18,0.05,'triangle']].forEach(function(p) {
+    var o=ctx.createOscillator(); var g=ctx.createGain();
+    o.type=p[3]; o.frequency.value=p[0];
+    g.gain.setValueAtTime(0,t+p[1]); g.gain.linearRampToValueAtTime(p[2],t+p[1]+0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+p[1]+1.6);
+    o.connect(g); g.connect(_sfxGain); o.start(t+p[1]); o.stop(t+p[1]+1.8);
+  });
+}
+
+function sfxLevelUp() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  // Ascending 5-note arpeggio — celebratory
+  [261.6, 329.6, 392, 523.3, 659.3].forEach(function(freq, i) {
+    var o=ctx.createOscillator(); var g=ctx.createGain();
+    o.type='triangle'; o.frequency.value=freq;
+    var onset=t+i*0.1;
+    g.gain.setValueAtTime(0,onset); g.gain.linearRampToValueAtTime(0.1,onset+0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001,onset+0.55);
+    o.connect(g); g.connect(_sfxGain); o.start(onset); o.stop(onset+0.6);
+  });
+}
+
+function sfxClassUnlock() {
+  if (!_audioEnabled || !_sfxEnabled) return;
+  var ctx = getAudioCtx(); var t = ctx.currentTime;
+  // Decisive two-note confirm
+  [[392,0,0.08],[523.3,0.1,0.09]].forEach(function(p) {
+    var o=ctx.createOscillator(); var g=ctx.createGain();
+    o.type='sine'; o.frequency.value=p[0];
+    g.gain.setValueAtTime(0,t+p[1]); g.gain.linearRampToValueAtTime(p[2],t+p[1]+0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+p[1]+0.5);
+    o.connect(g); g.connect(_sfxGain); o.start(t+p[1]); o.stop(t+p[1]+0.55);
+  });
 }
 
 function sfxResist() {
