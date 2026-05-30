@@ -3310,16 +3310,16 @@ function rollCreature(biome, lure, dailyBoostId) {
 
 function creatureStats(c) {
   const mult = c.unique && c.unique.prismatic ? 2.0 : c.unique ? 1.25 : 1;
-  // bondedStat: player-chosen key; legacy saves fall back to first type affinity
-  const bondStat = c.bonded ? (c.bondedStat || (TYPE_AFFINITY[c.type] || [])[0] || null) : null;
   const s = {};
   Object.keys(c.stats).forEach(k => {
     const base = c.stats[k] * mult;
-    if (bondStat === k) {
-      s[k] = Math.max(Math.round(base) + 1, Math.round(base * 1.20));
-    } else {
-      s[k] = Math.round(base);
+    let val = Math.round(base);
+    if (c.bondPoints && c.bondPoints[k]) {
+      val += c.bondPoints[k];                           // new: flat allocated points
+    } else if (c.bonded && c.bondedStat === k) {
+      val = Math.max(val + 1, Math.round(base * 1.20)); // legacy: single-stat +20%
     }
+    s[k] = val;
   });
   return s;
 }
@@ -4342,7 +4342,7 @@ function applyUniqueName() {
   toast('✨ Named: ' + (c ? c.name + ' — ' + name : name));
   renderRoster();
   autoSave();
-  if (c && c.bonded && !c.bondedStat) setTimeout(function(){ openBondStatModal(c); }, 400);
+  if (c && c.bonded && !c.bondPoints) setTimeout(function(){ openBondStatModal(c); }, 400);
 }
 
 function skipUniqueName() {
@@ -4351,7 +4351,7 @@ function skipUniqueName() {
   document.getElementById('name-modal').style.display = 'none';
   var c = S.roster.find(function(x){ return x.uid == pendingUid; });
   toast('✨ Unique ' + (c ? c.name : 'creature') + ' captured!');
-  if (c && c.bonded && !c.bondedStat) setTimeout(function(){ openBondStatModal(c); }, 400);
+  if (c && c.bonded && !c.bondPoints) setTimeout(function(){ openBondStatModal(c); }, 400);
 }
 
 
@@ -6551,55 +6551,80 @@ function closeRiteRelease() {
 }
 
 var _bsmUid = null;
+var _bsmAlloc = { hp:0, atk:0, def:0, spd:0, mana:0 };
+var _bsmPool  = 0;
+var BOND_POOL  = { common:3, uncommon:4, rare:5, epic:6, legendary:8, mythic:10 };
 
 function openBondStatModal(c) {
-  _bsmUid = c.uid;
-  var STAT_LABELS = { hp:'HP', atk:'ATK', def:'DEF', spd:'SPD', mana:'MANA' };
-  var STAT_COL   = { hp:'#f87171', atk:'#f97316', def:'#60a5fa', spd:'#4ade80', mana:'#e879f9' };
-  var STAT_DESC  = { hp:'Durability and staying power', atk:'Offensive strength', def:'Resistance to threats', spd:'Agility and reaction time', mana:'Arcane and elemental force' };
-  var mult = c.unique && c.unique.prismatic ? 2.0 : c.unique ? 1.25 : 1;
-  var affinity = TYPE_AFFINITY[c.type] || [];
-  var src = speciesArtSrc(c.id);
-  var imgFilter = _uniqueImgFilter(c.unique);
-  var portrait = src
-    ? '<div style="width:52px;height:52px;border-radius:10px;overflow:hidden;flex-shrink:0"><img src="' + src + '" style="width:100%;height:100%;object-fit:cover' + (imgFilter ? ';filter:' + imgFilter : '') + '"></div>'
-    : '<span style="font-size:36px;flex-shrink:0">' + c.emoji + '</span>';
-  var btns = ['hp','atk','def','spd','mana'].map(function(k) {
-    var base = Math.round((c.stats[k] || 0) * mult);
-    var boosted = Math.max(base + 1, Math.round(base * 1.20));
-    var isRec = affinity.indexOf(k) >= 0;
-    return '<button class="bsm-stat-btn' + (isRec ? ' recommended' : '') + '" onclick="confirmBondStat(\'' + k + '\')" style="--sc:' + STAT_COL[k] + '">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
-      + '<span style="font-size:12px;font-weight:700;color:' + STAT_COL[k] + ';font-family:Cinzel,serif">' + STAT_LABELS[k] + (isRec ? ' <span style="font-size:9px;color:var(--gold);font-family:Raleway,sans-serif">★ suggested</span>' : '') + '</span>'
-      + '<span style="font-size:12px;color:var(--text-muted)">' + base + ' <span style="color:' + STAT_COL[k] + ';font-weight:700">→ ' + boosted + '</span></span>'
-      + '</div>'
-      + '<div style="font-size:10px;color:var(--text-muted)">' + STAT_DESC[k] + '</div>'
-      + '</button>';
-  }).join('');
-  var defaultStat = affinity[0] || 'hp';
-  document.getElementById('bond-stat-inner').innerHTML =
-    '<div style="padding:20px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0">'
-    + '<div style="display:flex;align-items:center;gap:12px">'
-    + portrait
-    + '<div><div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">Bond Enhancement</div>'
-    + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + c.name + ' — choose one stat to strengthen by +20%</div></div>'
-    + '</div></div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px;overflow-y:auto;flex:1">' + btns + '</div>'
-    + '<div style="padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 10px);border-top:1px solid var(--border);flex-shrink:0">'
-    + '<button onclick="confirmBondStat(\'' + defaultStat + '\')" style="background:none;border:none;color:var(--text-muted);font-size:10px;font-family:Raleway,sans-serif;cursor:pointer;text-decoration:underline;width:100%;padding:4px">Use suggested (' + STAT_LABELS[defaultStat] + ')</button>'
-    + '</div>';
+  _bsmUid   = c.uid;
+  _bsmPool  = BOND_POOL[c.rarity] || 3;
+  _bsmAlloc = { hp:0, atk:0, def:0, spd:0, mana:0 };
+  _renderBondStatModal(c);
   document.getElementById('bond-stat-modal').style.display = 'flex';
 }
 
-function confirmBondStat(statKey) {
+function _renderBondStatModal(c) {
+  var SL = { hp:'HP', atk:'ATK', def:'DEF', spd:'SPD', mana:'MANA' };
+  var SC = { hp:'#f87171', atk:'#f97316', def:'#60a5fa', spd:'#4ade80', mana:'#e879f9' };
+  var mult = c.unique && c.unique.prismatic ? 2.0 : c.unique ? 1.25 : 1;
+  var used = Object.keys(_bsmAlloc).reduce(function(s,k){ return s + (_bsmAlloc[k]||0); }, 0);
+  var rem  = _bsmPool - used;
+  var src = speciesArtSrc(c.id);
+  var imgFilter = _uniqueImgFilter(c.unique);
+  var portrait = src
+    ? '<div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0"><img src="' + src + '" style="width:100%;height:100%;object-fit:cover' + (imgFilter ? ';filter:' + imgFilter : '') + '"></div>'
+    : '<span style="font-size:30px;flex-shrink:0">' + c.emoji + '</span>';
+  var rows = ['hp','atk','def','spd','mana'].map(function(k) {
+    var base  = Math.round((c.stats[k] || 0) * mult);
+    var alloc = _bsmAlloc[k] || 0;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'
+      + '<div style="width:40px;font-size:11px;font-weight:700;font-family:Cinzel,serif;color:' + (alloc > 0 ? SC[k] : 'var(--text-muted)') + ';flex-shrink:0">' + SL[k] + '</div>'
+      + '<button onclick="_bsmAdj(\'' + k + '\',-1)" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);font-size:18px;line-height:1;cursor:pointer;flex-shrink:0;opacity:' + (alloc > 0 ? 1 : 0.25) + '" ' + (alloc <= 0 ? 'disabled' : '') + '>−</button>'
+      + '<div style="flex:1;text-align:center;font-size:13px">'
+      + '<span style="color:var(--text-dim)">' + base + '</span>'
+      + (alloc > 0 ? '<span style="color:' + SC[k] + ';font-weight:700"> +' + alloc + ' = ' + (base+alloc) + '</span>' : '')
+      + '</div>'
+      + '<button onclick="_bsmAdj(\'' + k + '\',1)" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);font-size:18px;line-height:1;cursor:pointer;flex-shrink:0;opacity:' + (rem > 0 ? 1 : 0.25) + '" ' + (rem <= 0 ? 'disabled' : '') + '>+</button>'
+      + '</div>';
+  }).join('');
+  document.getElementById('bond-stat-inner').innerHTML =
+    '<div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'
+    + portrait
+    + '<div><div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold)">Bond Enhancement</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">' + c.name + ' · ' + (c.rarity||'') + ' · ' + _bsmPool + ' points to allocate</div></div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between">'
+    + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:1px">POINTS REMAINING</div>'
+    + '<div style="font-family:Cinzel,serif;font-size:22px;font-weight:700;color:' + (rem===0?'#4ade80':'var(--gold)') + '">' + rem + ' <span style="font-size:12px;color:var(--text-muted);font-family:Raleway,sans-serif">/ ' + _bsmPool + '</span></div>'
+    + '</div></div>'
+    + '<div style="padding:0 20px;overflow-y:auto;flex:1">' + rows + '</div>'
+    + '<div style="padding:12px 20px calc(env(safe-area-inset-bottom,0px) + 12px);border-top:1px solid var(--border);flex-shrink:0">'
+    + '<button onclick="confirmBondStat()" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--purple),#a855f7);border:none;border-radius:12px;color:#fff;font-family:Cinzel,serif;font-size:13px;letter-spacing:1px;cursor:pointer">'
+    + (rem > 0 ? 'Confirm (' + rem + ' unspent)' : 'Confirm Bond ✓') + '</button>'
+    + '</div>';
+}
+
+function _bsmAdj(stat, delta) {
+  var c = S.roster.concat(S.void_).find(function(x){ return x.uid === _bsmUid; });
+  if (!c) return;
+  var used = Object.keys(_bsmAlloc).reduce(function(s,k){ return s + (_bsmAlloc[k]||0); }, 0);
+  var cur  = _bsmAlloc[stat] || 0;
+  if (delta > 0 && used >= _bsmPool) return;
+  if (delta < 0 && cur <= 0) return;
+  _bsmAlloc[stat] = cur + delta;
+  _renderBondStatModal(c);
+}
+
+function confirmBondStat() {
   if (!_bsmUid) return;
   var c = S.roster.concat(S.void_).find(function(x){ return x.uid === _bsmUid; });
-  if (c) c.bondedStat = statKey;
+  if (c) { c.bondPoints = Object.assign({}, _bsmAlloc); delete c.bondedStat; }
   _bsmUid = null;
   document.getElementById('bond-stat-modal').style.display = 'none';
   autoSave();
-  var STAT_LABELS = { hp:'HP', atk:'ATK', def:'DEF', spd:'SPD', mana:'MANA' };
-  toast('🤝 ' + (c ? c.name : 'Bond') + ': ' + STAT_LABELS[statKey] + ' +20%');
+  var used = Object.keys(_bsmAlloc).reduce(function(s,k){ return s + (_bsmAlloc[k]||0); }, 0);
+  toast('🤝 ' + (c ? c.name : 'Bond') + ': ' + used + ' point' + (used!==1?'s':'') + ' allocated');
 }
 
 function confirmRiteRelease() {
@@ -8671,24 +8696,31 @@ function creatureCard(c, selectedKey, fromVoid) {
   const STAT_COL = { hp:'#f87171', atk:'#f97316', def:'#60a5fa', spd:'#4ade80', mana:'#e879f9' };
   const STAT_LABELS = { hp:'HP', atk:'ATK', def:'DEF', spd:'SPD', mana:'MANA' };
   const cs = creatureStats(c);
-  const _bondStat = c.bonded ? (c.bondedStat || (TYPE_AFFINITY[c.type] || [])[0] || null) : null;
   const statRows = Object.keys(cs).map(function(k) {
     const val = cs[k];
     const pct = Math.min(100, Math.round((val / STAT_MAX[k]) * 100));
-    const isBonded = _bondStat === k;
+    const pts = c.bondPoints ? (c.bondPoints[k] || 0) : (c.bonded && c.bondedStat === k ? 1 : 0);
+    const isBonded = pts > 0;
     return `<div class="stat-row">
       <div class="stat-row-label" style="color:${isBonded ? STAT_COL[k] : ''}">${STAT_LABELS[k]}</div>
       <div class="stat-row-bar">
         <div class="stat-row-fill" style="width:${pct}%;background:${STAT_COL[k]};opacity:${isBonded?1:0.55}"></div>
       </div>
-      <div class="stat-row-val">${val}${isBonded ? '<span style="color:'+STAT_COL[k]+';font-size:8px">↑</span>' : ''}</div>
+      <div class="stat-row-val">${val}${isBonded ? `<span style="color:${STAT_COL[k]};font-size:8px">${c.bondPoints ? ' +'+pts : '↑'}</span>` : ''}</div>
     </div>`;
   }).join('');
 
+  const _bondNote = (function() {
+    if (!c.bonded) return `<div class="affinity-note" style="opacity:0.4">Type affinity: ${(TYPE_AFFINITY[c.type]||[]).map(s=>STAT_LABELS[s]).join(' + ')}</div>`;
+    if (c.bondPoints) {
+      var parts = Object.keys(c.bondPoints).filter(function(k){ return c.bondPoints[k]>0; }).map(function(k){ return STAT_LABELS[k]+' +'+c.bondPoints[k]; });
+      return `<div class="affinity-note">🤝 Bond: ${parts.join(' · ')||'no points allocated'}${c.unique && c.unique.prismatic ? ' <span style="animation:prismatic-text 3s linear infinite;font-weight:600">· ×2 prismatic</span>' : ''}</div>`;
+    }
+    return `<div class="affinity-note">🤝 Bond: ${STAT_LABELS[c.bondedStat]||''} +20% (legacy)${c.unique && c.unique.prismatic ? ' · ×2 prismatic' : ''}</div>`;
+  })();
   const statBlock = `<div class="stat-block">
     <div class="stat-block-title">Combat Stats</div>
-    ${statRows}
-    ${_bondStat ? `<div class="affinity-note">🤝 Bond: ${STAT_LABELS[_bondStat]} +20%${c.unique && c.unique.prismatic ? ' <span style="animation:prismatic-text 3s linear infinite;font-weight:600">· ×2 prismatic</span>' : ''}</div>` : `<div class="affinity-note" style="opacity:0.5">Type affinity: ${(TYPE_AFFINITY[c.type]||[]).map(s=>STAT_LABELS[s]).join(' + ')}${c.unique && c.unique.prismatic ? ' · ×2 prismatic' : ''}</div>`}
+    ${statRows}${_bondNote}
   </div>`;
 
   // ── Bond badge ───────────────────────────────────────────────────────
@@ -9392,15 +9424,15 @@ function openCreatureInspect(uid, fromVoid) {
   var STAT_COL = {hp:'#f87171',atk:'#f97316',def:'#60a5fa',spd:'#4ade80',mana:'#e879f9'};
   var STAT_LABELS = {hp:'HP',atk:'ATK',def:'DEF',spd:'SPD',mana:'MANA'};
   var cs = creatureStats(c);
-  var _bs = c.bonded ? (c.bondedStat || (TYPE_AFFINITY[c.type] || [])[0] || null) : null;
   var statRows = Object.keys(cs).map(function(k) {
     var val = cs[k];
     var pct = Math.min(100, Math.round((val / STAT_MAX[k]) * 100));
-    var isBond = _bs === k;
+    var pts = c.bondPoints ? (c.bondPoints[k]||0) : (c.bonded && c.bondedStat === k ? 1 : 0);
+    var isBond = pts > 0;
     return '<div class="stat-row">'
       + '<div class="stat-row-label" style="color:' + (isBond ? STAT_COL[k] : '') + '">' + STAT_LABELS[k] + '</div>'
       + '<div class="stat-row-bar"><div class="stat-row-fill" style="width:' + pct + '%;background:' + STAT_COL[k] + ';opacity:' + (isBond ? 1 : 0.55) + '"></div></div>'
-      + '<div class="stat-row-val">' + val + (isBond ? '<span style="color:' + STAT_COL[k] + ';font-size:8px">↑</span>' : '') + '</div>'
+      + '<div class="stat-row-val">' + val + (isBond ? '<span style="color:' + STAT_COL[k] + ';font-size:8px">' + (c.bondPoints ? ' +'+pts : '↑') + '</span>' : '') + '</div>'
       + '</div>';
   }).join('');
   var affinityLabel = affinityKeys.map(function(s){ return STAT_LABELS[s]; }).join(' + ');
