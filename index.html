@@ -12218,15 +12218,10 @@ function showTutorialNotif(title) {
 function queueTutorial(id) {
   var e = TUTORIAL_ENTRIES[id];
   if (!e) return;
-  // Mark in story log so it doesn't repeat
   var seen = S.story.log.find(function(x){ return x.id === id; });
   if (seen) return;
   S.story.log.push({id: id, read: false, tutorial: true});
   updateJournalBadge();
-  showTutorialNotif(e.title);
-  // Queue for display — uses same letter panel but with tutorial styling
-  _letterQueue.push('__tut__' + id);
-  if (_letterQueue.length === 1) _showNextLetter();
 }
 
 
