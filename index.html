@@ -13437,25 +13437,26 @@ var VOICE_PROFILES = {
 function getVoices() {
   if (!window.speechSynthesis) return [];
   var voices = window.speechSynthesis.getVoices();
-  // Prefer English voices — look for natural-sounding ones
-  var preferred = voices.filter(function(v) {
-    return v.lang.startsWith('en') && (
-      v.name.toLowerCase().includes('samantha') ||
-      v.name.toLowerCase().includes('karen')    ||
-      v.name.toLowerCase().includes('moira')    ||
-      v.name.toLowerCase().includes('daniel')   ||
-      v.name.toLowerCase().includes('rishi')    ||
-      v.name.toLowerCase().includes('fiona')    ||
-      v.name.toLowerCase().includes('alex')     ||
-      v.name.toLowerCase().includes('victoria') ||
-      v.name.toLowerCase().includes('kate')     ||
-      v.name.toLowerCase().includes('arthur')
-    );
+  var en = voices.filter(function(v) { return v.lang.startsWith('en'); });
+  if (!en.length) return voices;
+
+  // Tier 1: online/neural voices (Chrome "Google" voices, Edge "Microsoft Natural" voices)
+  // localService:false means the browser streams these from a cloud TTS engine
+  var neural = en.filter(function(v) { return !v.localService; });
+
+  // Tier 2: named high-quality local voices (macOS enhanced, Windows premium)
+  var qualityNames = ['samantha','karen','moira','daniel','rishi','fiona','alex',
+    'victoria','kate','arthur','aria','jenny','sonia','libby','ryan','guy','davis',
+    'zira','hazel','neerja','enhanced','natural','neural','premium'];
+  var named = en.filter(function(v) {
+    var n = v.name.toLowerCase();
+    return qualityNames.some(function(q) { return n.includes(q); });
   });
-  if (preferred.length) return preferred;
-  // Fall back to any English voice
-  var english = voices.filter(function(v) { return v.lang.startsWith('en'); });
-  return english.length ? english : voices;
+
+  // Prefer neural → named → any English
+  if (neural.length) return neural;
+  if (named.length) return named;
+  return en;
 }
 
 function getBestVoice(speaker) {
@@ -13463,24 +13464,19 @@ function getBestVoice(speaker) {
   var voices = getVoices();
   if (!voices.length) return null;
   var voice = null;
-  // Warden / Keeper — prefer a deeper male voice if available
+  var maleNames   = ['daniel','arthur','rishi','alex','guy','ryan','davis','liam','oliver'];
+  var femaleNames = ['samantha','karen','victoria','fiona','kate','moira','aria','jenny',
+                     'sonia','libby','zira','hazel','neerja','ava','allison','susan'];
+  function pickVoice(preferred) {
+    return voices.find(function(v) {
+      var n = v.name.toLowerCase();
+      return preferred.some(function(p) { return n.includes(p); });
+    }) || voices[0];
+  }
   if (speaker === 'The Warden' || speaker === 'The Keeper') {
-    voice = voices.find(function(v) {
-      return v.name.toLowerCase().includes('daniel') ||
-             v.name.toLowerCase().includes('arthur') ||
-             v.name.toLowerCase().includes('rishi')  ||
-             v.name.toLowerCase().includes('alex');
-    }) || voices[0];
+    voice = pickVoice(maleNames);
   } else if (speaker === 'Maren' || speaker === 'Sable') {
-    // Prefer a female voice
-    voice = voices.find(function(v) {
-      return v.name.toLowerCase().includes('samantha') ||
-             v.name.toLowerCase().includes('karen')    ||
-             v.name.toLowerCase().includes('victoria') ||
-             v.name.toLowerCase().includes('fiona')    ||
-             v.name.toLowerCase().includes('kate')     ||
-             v.name.toLowerCase().includes('moira');
-    }) || voices[0];
+    voice = pickVoice(femaleNames);
   } else {
     voice = voices[0];
   }
@@ -13494,15 +13490,25 @@ function narrateEntry(entry) {
 
   var profile = VOICE_PROFILES[entry.speaker] || VOICE_PROFILES['default'];
 
-  // Build narration text: title, optional speaker attribution, then body
-  // Strip italic markdown (*text*) for cleaner speech
-  var cleanBody = entry.body
-    .replace(/\*([^*]+)\*/g, '$1')   // *italic* → plain
-    .replace(/\n\n/g, '. ')           // paragraph breaks → pause
-    .replace(/\n/g, ', ');            // line breaks → short pause
+  // Clean and shape text for natural speech
+  var cleanBody = (entry.body || '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')   // **bold** → plain
+    .replace(/\*([^*]+)\*/g, '$1')        // *italic* → plain
+    .replace(/—/g, '. ')                  // em-dash → full pause
+    .replace(/–/g, ', ')                  // en-dash → short pause
+    .replace(/\.{3}/g, '. ')             // ellipsis → breath pause
+    .replace(/\n\n+/g, '. ')             // paragraph → full pause
+    .replace(/\n/g, ', ')                // line break → brief pause
+    .replace(/[ \t]{2,}/g, ' ')          // collapse extra spaces
+    .trim();
 
-  var speakerPrefix = entry.speaker ? entry.speaker + ' writes: ' : '';
-  var fullText = entry.title + '. ' + speakerPrefix + cleanBody;
+  // Speaker announced once, softly, before the body — no robotic "writes:"
+  var speakerLine = entry.speaker ? entry.speaker + '. ' : '';
+  // Skip re-reading the title if the body opens with the same words
+  var titleLine = entry.title && !cleanBody.toLowerCase().startsWith(entry.title.toLowerCase().slice(0,12))
+    ? entry.title + '. '
+    : '';
+  var fullText = titleLine + speakerLine + cleanBody;
 
   // Load voices — they may not be ready on first call
   if (!window.speechSynthesis.getVoices().length) {
