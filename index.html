@@ -4335,7 +4335,7 @@ function applyUniqueName() {
   var name = inp ? inp.value.trim() : '';
   if (!name) { if(inp) inp.style.borderColor='#f87171'; return; }
   var pendingUid = S.pendingName;
-  var c = S.roster.find(function(x){ return x.uid == pendingUid; });
+  var c = S.roster.concat(S.void_).find(function(x){ return x.uid == pendingUid; });
   if (c) { c.uniqueName = name; }
   S.pendingName = null;
   document.getElementById('name-modal').style.display = 'none';
@@ -4349,7 +4349,7 @@ function skipUniqueName() {
   var pendingUid = S.pendingName;
   S.pendingName = null;
   document.getElementById('name-modal').style.display = 'none';
-  var c = S.roster.find(function(x){ return x.uid == pendingUid; });
+  var c = S.roster.concat(S.void_).find(function(x){ return x.uid == pendingUid; });
   toast('✨ Unique ' + (c ? c.name : 'creature') + ' captured!');
   if (c && c.bonded && !c.bondPoints) setTimeout(function(){ openBondStatModal(c); }, 400);
 }
@@ -6556,9 +6556,10 @@ var _bsmPool  = 0;
 var BOND_POOL  = { common:3, uncommon:4, rare:5, epic:6, legendary:8, mythic:10 };
 
 function openBondStatModal(c) {
-  _bsmUid   = c.uid;
-  _bsmPool  = BOND_POOL[c.rarity] || 3;
-  _bsmAlloc = { hp:0, atk:0, def:0, spd:0, mana:0 };
+  _bsmUid = c.uid;
+  if (!c.bondPool) c.bondPool = (BOND_POOL[c.rarity] || 3) + Math.floor(Math.random() * 5) + 1;
+  _bsmPool  = c.bondPool;
+  _bsmAlloc = Object.assign({ hp:0, atk:0, def:0, spd:0, mana:0 }, c.bondPoints || {});
   _renderBondStatModal(c);
   document.getElementById('bond-stat-modal').style.display = 'flex';
 }
@@ -9445,6 +9446,9 @@ function openCreatureInspect(uid, fromVoid) {
   var voidFull = S.void_.length >= getVoidMax();
   var rosterFull = S.roster.length >= getRosterMax();
   var actBtns = '';
+  if (c.bonded) {
+    actBtns += '<button onclick="closeCreatureInspect();setTimeout(function(){var _bc=S.roster.concat(S.void_).find(function(x){return x.uid===' + uid + ';});if(_bc)openBondStatModal(_bc);},60)" style="padding:8px 14px;background:rgba(232,121,249,0.08);border:1px solid rgba(232,121,249,0.3);color:#e879f9;font-size:12px">🤝 Bond Points</button>';
+  }
   if (c.unique && c.id !== 'formless' && _cloudUser) {
     actBtns += '<button onclick="closeCreatureInspect();setTimeout(function(){showTradePanel(' + uid + ')},60)" style="padding:8px 14px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);color:#f97316;font-size:12px">⇄ Trade</button>';
   }
