@@ -4151,7 +4151,7 @@ function switchTab(tab) {
   if (tab === 'hunt') renderHunt();
   else if (tab === 'craft') renderCraft();
   else if (tab === 'roster') renderRoster();
-  else if (tab === 'void') renderVoid();
+  else if (tab === 'void') { renderVoid(); setTimeout(function(){ showCoachMark('cm_void_intro'); }, 150); }
   else if (tab === 'journal') renderJournal();
   else if (tab === 'bestiary') renderBestiary();
 }
@@ -9364,6 +9364,7 @@ function renderRoster() {
     + '</span></div>'
     + overview
     + renderByRarity(S.roster, false);
+  setTimeout(_checkRosterCoachMarks, 100);
 }
 
 function renderVoid() {
@@ -9473,6 +9474,7 @@ function renderVoid() {
     : '<div style="text-align:center;padding:32px 16px;color:var(--text-muted);font-size:12px">No ' + filter + ' creatures in the Void.</div>';
 
   el.innerHTML = header + cards;
+  setTimeout(_checkVoidCoachMarks, 100);
 }
 
 function renderCraft() {
@@ -9890,7 +9892,7 @@ function renderCraft() {
       suggestionHtml +
       lureSection + cakeSection + scentSection + catalystSection + charmSection
       + (_craftPhase >= 2 ? refineSection : '') + (_craftPhase >= 1 ? upgradeSection : '') + wardenPostHtml + ritesSection;
-
+  setTimeout(_checkCraftCoachMarks, 100);
 }
 function openCreatureInspect(uid, fromVoid) {
   var list = fromVoid ? S.void_ : S.roster;
