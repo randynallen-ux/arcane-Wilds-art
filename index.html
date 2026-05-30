@@ -2291,8 +2291,9 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         <hr style="border:none;border-top:1px solid rgba(139,109,56,0.3);margin-bottom:14px"/>
       </div>
       <div id="fn-body" style="position:relative;z-index:1;padding:0 20px;overflow-y:auto;flex:1;font-size:15px;font-weight:500;color:#1a0e00;font-family:Georgia,serif;line-height:1.9;white-space:pre-line"></div>
-      <div style="position:relative;z-index:1;padding:16px 20px 28px;flex-shrink:0">
-        <button onclick="closeFieldNote()" style="width:100%;padding:12px;background:rgba(101,75,30,0.12);border:1.5px solid rgba(139,109,56,0.35);border-radius:12px;color:#3d2b0a;font-family:Cinzel,serif;font-size:12px;letter-spacing:2px;cursor:pointer">Close Field Note</button>
+      <div style="position:relative;z-index:1;padding:16px 20px 28px;flex-shrink:0;display:flex;gap:8px">
+        <button onclick="replayFieldNoteNarration()" title="Read aloud" style="flex-shrink:0;padding:12px 14px;background:rgba(101,75,30,0.08);border:1.5px solid rgba(139,109,56,0.3);border-radius:12px;color:#5a3e10;font-size:14px;cursor:pointer">🎙</button>
+        <button onclick="closeFieldNote()" style="flex:1;padding:12px;background:rgba(101,75,30,0.12);border:1.5px solid rgba(139,109,56,0.35);border-radius:12px;color:#3d2b0a;font-family:Cinzel,serif;font-size:12px;letter-spacing:2px;cursor:pointer">Close Field Note</button>
       </div>
     </div>
   </div>
@@ -8699,6 +8700,8 @@ function confirmReturnToMenu() {
 
 
 // ── FIELD NOTES ──────────────────────────────────────────────────────────
+var _currentFieldNoteCreature = null;
+
 function showFieldNote(creature) {
   var c = creature;
   var rc = RARITIES[c.rarity] || {};
@@ -8711,11 +8714,20 @@ function showFieldNote(creature) {
   document.getElementById('fn-body').textContent  = FIELD_NOTES[c.id] || '';
   document.getElementById('field-note-modal').style.display = 'flex';
   sfxLetterOpen();
+  _currentFieldNoteCreature = c;
+  if (_narrationEnabled) narrateEntry({ title: c.name, speaker: null, body: FIELD_NOTES[c.id] || '' });
+}
+
+function replayFieldNoteNarration() {
+  if (!_currentFieldNoteCreature) return;
+  narrateEntry({ title: _currentFieldNoteCreature.name, speaker: null, body: FIELD_NOTES[_currentFieldNoteCreature.id] || '' });
 }
 
 function closeFieldNote() {
   document.getElementById('field-note-modal').style.display = 'none';
   sfxLetterDismiss();
+  stopNarration();
+  _currentFieldNoteCreature = null;
 }
 
 function openFieldNoteFromBestiary(id) {
