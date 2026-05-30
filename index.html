@@ -429,6 +429,51 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   transform:translateX(-50%) translateY(0);
   opacity:1;
 }
+/* ─── COACH MARKS ──────────────────────────────────────────────────────────── */
+#coach-layer{position:fixed;inset:0;pointer-events:none;z-index:850;display:none;transition:opacity .2s}
+.coach-mark{
+  position:fixed;max-width:270px;
+  background:var(--bg2);
+  border:1px solid rgba(201,168,76,0.38);
+  border-radius:14px;padding:14px 16px 11px;
+  pointer-events:all;cursor:pointer;
+  box-shadow:0 8px 32px rgba(0,0,0,0.6),0 0 0 1px rgba(201,168,76,0.08);
+  animation:coach-in .22s cubic-bezier(.22,.8,.36,1);
+}
+.coach-title{
+  font-family:Cinzel,serif;font-size:10px;font-weight:700;
+  letter-spacing:.1em;color:var(--gold);text-transform:uppercase;margin-bottom:6px;
+}
+.coach-text{font-size:12.5px;color:var(--text);line-height:1.55;margin-bottom:10px}
+.coach-dismiss{font-size:9px;letter-spacing:.06em;color:var(--text-muted);text-align:center;text-transform:uppercase}
+.coach-arrow-up{
+  position:absolute;top:-7px;width:0;height:0;
+  border-left:7px solid transparent;border-right:7px solid transparent;
+  border-bottom:7px solid rgba(201,168,76,0.38);
+}
+.coach-arrow-up::after{
+  content:'';position:absolute;top:2px;left:-6px;width:0;height:0;
+  border-left:6px solid transparent;border-right:6px solid transparent;
+  border-bottom:6px solid var(--bg2);
+}
+.coach-arrow-down{
+  position:absolute;bottom:-7px;width:0;height:0;
+  border-left:7px solid transparent;border-right:7px solid transparent;
+  border-top:7px solid rgba(201,168,76,0.38);
+}
+.coach-arrow-down::after{
+  content:'';position:absolute;bottom:2px;left:-6px;width:0;height:0;
+  border-left:6px solid transparent;border-right:6px solid transparent;
+  border-top:6px solid var(--bg2);
+}
+.coach-target{
+  outline:2px solid rgba(201,168,76,0.5)!important;
+  outline-offset:3px;border-radius:6px;
+  animation:coach-pulse 1.6s ease-in-out infinite;
+  position:relative;z-index:851;
+}
+@keyframes coach-in{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes coach-pulse{0%,100%{outline-color:rgba(201,168,76,0.3)}50%{outline-color:rgba(201,168,76,0.75)}}
 @keyframes pulseFade{
   0%,100%{opacity:0.4}
   50%{opacity:1}
@@ -2104,6 +2149,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
     </div>
   </div>
   <div id="tutorial-notif">🖊 Field Guide entry added</div>
+  <div id="coach-layer"></div>
 
   <!-- OPTIONS MENU -->
   <div id="options-menu" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:750;align-items:flex-end;justify-content:center;padding:0">
@@ -3140,6 +3186,7 @@ let S = {
     pendingChoice: null,
   },
   seenHints: [],
+  seenCoachMarks: [],
   attunement: 0,
   classUnlocks: { t2: null, t3: null, t4: null },
 };
@@ -8190,6 +8237,206 @@ function markHintSeen(id) {
   if (S.seenHints.indexOf(id) < 0) S.seenHints.push(id);
 }
 
+// ─── COACH MARKS ──────────────────────────────────────────────────────────
+const COACH_MARKS = {
+  cm_field_sign: {
+    sel:'.field-sign-card', arrow:'down',
+    title:'Field Sign',
+    text:'A trace of the creature ahead. Your patience won\'t start until you Approach — take your time.',
+  },
+  cm_patience: {
+    sel:'#patience-bar-wrap', arrow:'up',
+    title:'Patience',
+    text:'This drains after your first approach. Empty it and the creature flees. Keep an eye on the colour.',
+  },
+  cm_approach: {
+    sel:'.approach-grid', arrow:'up',
+    title:'Approach Methods',
+    text:'Each method carries a different catch rate. The breakdown is shown just above. Pick your angle.',
+  },
+  cm_state_badge: {
+    sel:'.creature-state-badge', arrow:'down',
+    title:'Creature State',
+    text:'States shift as you approach. Distracted gives the highest catch chance — wait for it if you can.',
+  },
+  cm_roster_full_hunt: {
+    sel:'.roster-slots', arrow:'down',
+    title:'Roster Full',
+    text:'No roster space left. Open Roster and send a creature to the Void before you can catch more.',
+  },
+  cm_inspect: {
+    sel:'.btn.btn-void', arrow:'up',
+    title:'Cards & Options',
+    text:'Tap any creature card to expand it. From there you can inspect stats, send to the Void, or release.',
+  },
+  cm_bond_badge: {
+    sel:'.bond-badge', arrow:'down',
+    title:'Bond Points',
+    text:'This creature is bonded. Expand its card and tap \'Bond Points\' to permanently boost its stats.',
+  },
+  cm_void_send: {
+    sel:'.btn-void', arrow:'up',
+    title:'The Void',
+    text:'Roster getting full. The Void is extended storage — creatures there are safe and can be recalled anytime.',
+  },
+  cm_void_intro: {
+    sel:'#screen-void', arrow:'none',
+    title:'The Void',
+    text:'Creatures here are preserved outside your active roster. No time limit — recall them whenever you need a slot.',
+    center:true,
+  },
+  cm_void_recall: {
+    sel:'.btn.btn-void', arrow:'up',
+    title:'Recall',
+    text:'Brings the creature back to your active roster. You\'ll need a free roster slot first.',
+  },
+  cm_void_capacity: {
+    sel:'.void-cap-bar', arrow:'down',
+    title:'Void Capacity',
+    text:'The Void has a hard limit. When it fills you\'ll need to release creatures before storing more.',
+  },
+  cm_craft_first: {
+    sel:'.recipe-card', arrow:'down',
+    title:'Crafting',
+    text:'Components drop from captures. Craft lures to shift catch rates, or catalysts to boost a full session.',
+  },
+  cm_rite_first: {
+    sel:'.rite-card', arrow:'up',
+    title:'Keeper Rites',
+    text:'Rites cost components and require releasing creatures — but some can guarantee a unique encounter.',
+  },
+  cm_journal_badge: {
+    sel:'#journal-tab-btn', arrow:'down',
+    title:'New Journal Entry',
+    text:'A field guide entry was added. Tap Journal to read it — entries cover mechanics, story, and biome lore.',
+  },
+  cm_attunement: {
+    sel:'.class-card', arrow:'down',
+    title:'Attunement',
+    text:'You\'re earning Attunement — explorer XP from bonds, captures, and rites. Spend it to unlock class abilities.',
+  },
+};
+
+var _activeCoachMarkId = null;
+
+function hasSeenCoachMark(id) {
+  return !!(S.seenCoachMarks && S.seenCoachMarks.indexOf(id) >= 0);
+}
+
+function showCoachMark(id) {
+  if (!COACH_MARKS[id] || hasSeenCoachMark(id) || _activeCoachMarkId === id) return;
+  var cfg = COACH_MARKS[id];
+  var target = null;
+  var sels = cfg.sel.split(',').map(function(s){ return s.trim(); });
+  for (var i = 0; i < sels.length; i++) {
+    target = document.querySelector(sels[i]);
+    if (target) break;
+  }
+  if (!target) return;
+  _activeCoachMarkId = id;
+  var layer = document.getElementById('coach-layer');
+  if (!layer) return;
+  layer.innerHTML = '<div class="coach-mark" id="coach-mark-active" onclick="dismissCoachMark()">'
+    + (cfg.arrow !== 'none' ? '<div class="coach-arrow-' + cfg.arrow + '"></div>' : '')
+    + '<div class="coach-title">' + cfg.title + '</div>'
+    + '<div class="coach-text">' + cfg.text + '</div>'
+    + '<div class="coach-dismiss">tap to dismiss</div>'
+    + '</div>';
+  layer.style.display = 'block';
+  var mark = document.getElementById('coach-mark-active');
+  if (!mark) return;
+  if (cfg.center) {
+    mark.style.top = '50%'; mark.style.left = '50%';
+    mark.style.transform = 'translate(-50%,-50%)';
+    target.classList.add('coach-target');
+    return;
+  }
+  var mw = Math.min(270, window.innerWidth - 16);
+  mark.style.maxWidth = mw + 'px';
+  requestAnimationFrame(function() {
+    var rect = target.getBoundingClientRect();
+    var mh = mark.offsetHeight || 100;
+    var cx = rect.left + rect.width / 2;
+    var left = Math.max(8, Math.min(window.innerWidth - mw - 8, cx - mw / 2));
+    var arrowLeft = Math.max(12, Math.min(mw - 28, cx - left - 8));
+    if (cfg.arrow === 'up') {
+      mark.style.top = (rect.bottom + 8) + 'px';
+      mark.style.left = left + 'px';
+      var ae = mark.querySelector('.coach-arrow-up');
+      if (ae) ae.style.left = arrowLeft + 'px';
+    } else {
+      mark.style.top = Math.max(8, rect.top - 8 - mh) + 'px';
+      mark.style.left = left + 'px';
+      var ae2 = mark.querySelector('.coach-arrow-down');
+      if (ae2) ae2.style.left = arrowLeft + 'px';
+    }
+    target.classList.add('coach-target');
+  });
+}
+
+function dismissCoachMark() {
+  if (!_activeCoachMarkId) return;
+  var id = _activeCoachMarkId;
+  if (!S.seenCoachMarks) S.seenCoachMarks = [];
+  if (S.seenCoachMarks.indexOf(id) < 0) S.seenCoachMarks.push(id);
+  _activeCoachMarkId = null;
+  if (COACH_MARKS[id]) {
+    COACH_MARKS[id].sel.split(',').forEach(function(sel) {
+      var el = document.querySelector(sel.trim());
+      if (el) el.classList.remove('coach-target');
+    });
+  }
+  var layer = document.getElementById('coach-layer');
+  if (layer) {
+    layer.style.opacity = '0';
+    setTimeout(function(){ layer.innerHTML=''; layer.style.display='none'; layer.style.opacity='1'; }, 200);
+  }
+  saveGame();
+}
+
+function _checkHuntCoachMarks() {
+  if (_activeCoachMarkId) return;
+  var rosterFull = S.roster.length >= getRosterMax();
+  if (rosterFull) { showCoachMark('cm_roster_full_hunt'); return; }
+  if (!S.encounter && S.fieldSign && document.querySelector('.field-sign-card')) {
+    showCoachMark('cm_field_sign'); return;
+  }
+  if (S.encounter && document.getElementById('patience-bar-wrap')) {
+    showCoachMark('cm_patience'); return;
+  }
+  if (S.encounter && document.querySelector('.approach-grid')) {
+    showCoachMark('cm_approach'); return;
+  }
+  if (S.encounter && document.querySelector('.creature-state-badge')) {
+    showCoachMark('cm_state_badge'); return;
+  }
+  var hasUnread = S.story && S.story.log && S.story.log.some(function(e){ return !e.read; });
+  if (hasUnread) { showCoachMark('cm_journal_badge'); return; }
+  if (S.attunement > 0) { showCoachMark('cm_attunement'); return; }
+}
+
+function _checkRosterCoachMarks() {
+  if (_activeCoachMarkId) return;
+  var hasBonded = S.roster.some(function(c){ return c.bonded; });
+  if (hasBonded) { showCoachMark('cm_bond_badge'); return; }
+  if (S.roster.length >= 4) { showCoachMark('cm_void_send'); return; }
+  if (S.roster.length >= 1) { showCoachMark('cm_inspect'); return; }
+}
+
+function _checkVoidCoachMarks() {
+  if (_activeCoachMarkId) return;
+  if (!S.void_.length) return;
+  var voidPct = S.void_.length / getVoidMax();
+  if (voidPct >= 0.5) { showCoachMark('cm_void_capacity'); return; }
+  showCoachMark('cm_void_recall');
+}
+
+function _checkCraftCoachMarks() {
+  if (_activeCoachMarkId) return;
+  if (document.querySelector('.rite-card')) { showCoachMark('cm_rite_first'); return; }
+  if (document.querySelector('.recipe-card')) { showCoachMark('cm_craft_first'); return; }
+}
+
 function showMicroPrompt(anchorId, text, durationMs) {
   var anchor = document.getElementById(anchorId);
   if (!anchor) return;
@@ -8927,6 +9174,7 @@ function renderHunt() {
     <button class="btn btn-primary btn-full" onclick="startHunt()" ${S.hunting?'disabled':''} style="padding:14px;font-size:15px;letter-spacing:1px">
       ${S.hunting ? 'Searching...' : (S.encounter ? 'Hunt Again' : 'Hunt')}
     </button>`;
+  setTimeout(_checkHuntCoachMarks, 100);
 }
 
 function creatureCard(c, selectedKey, fromVoid) {
@@ -9800,6 +10048,7 @@ function buildSaveData() {
     creatureMemory: S.creatureMemory||{},
     dailySightings: S.dailySightings||{}, weeklyProgress: S.weeklyProgress||{},
     seenHints: S.seenHints||[],
+    seenCoachMarks: S.seenCoachMarks||[],
     activeBiomeId: S.activeBiome ? S.activeBiome.id : null,
     attunement: S.attunement || 0,
     classUnlocks: S.classUnlocks || { t2: null, t3: null, t4: null },
@@ -10016,7 +10265,8 @@ function applyData(data) {
   S.creatureMemory  = data.creatureMemory  || {};
   S.dailySightings  = data.dailySightings  || {};
   S.weeklyProgress  = data.weeklyProgress  || {};
-  S.seenHints       = data.seenHints       || [];
+  S.seenHints         = data.seenHints         || [];
+  S.seenCoachMarks    = data.seenCoachMarks    || [];
   S.activeBiome = data.activeBiomeId ? (BIOMES.find(function(b){ return b.id===data.activeBiomeId; })||null) : null;
   // Attunement — backfill for existing saves
   S.classUnlocks = data.classUnlocks || { t2: null, t3: null, t4: null };
