@@ -172,11 +172,11 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 @keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes shimmer{0%,100%{opacity:0.7}50%{opacity:1}}
-#splash{position:fixed;inset:0;background:linear-gradient(to bottom,rgba(3,2,13,0.72) 0%,rgba(3,2,13,0.25) 35%,rgba(3,2,13,0.42) 65%,rgba(3,2,13,0.88) 100%),url('https://qeaqbwqtkebimntlrchb.supabase.co/storage/v1/object/public/creature-art/Splash.jpeg') center/cover no-repeat #03020d;z-index:800;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
+#splash{position:fixed;inset:0;background:linear-gradient(to bottom,rgba(3,2,13,0.88) 0%,rgba(3,2,13,0.15) 35%,rgba(3,2,13,0.15) 65%,rgba(3,2,13,0.94) 100%),url('https://qeaqbwqtkebimntlrchb.supabase.co/storage/v1/object/public/creature-art/Splash.jpeg') center/cover no-repeat #03020d;z-index:800;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:56px 32px calc(env(safe-area-inset-bottom,0px) + 48px);text-align:center}
 #splash.hidden{display:none}
 .splash-title{font-family:'Cinzel',serif;font-size:11px;letter-spacing:6px;color:var(--gold-dim);margin-bottom:6px;animation:fadeIn .8s ease both}
-.splash-name{font-family:'Cinzel',serif;font-size:38px;font-weight:700;color:var(--gold);line-height:1;margin-bottom:4px;animation:fadeIn .9s .1s ease both}
-.splash-sub{font-family:'Cinzel',serif;font-size:13px;letter-spacing:3px;color:var(--text-dim);margin-bottom:48px;animation:fadeIn .9s .2s ease both}
+.splash-name{font-family:'Cinzel',serif;font-size:38px;font-weight:700;color:var(--gold);line-height:1;margin-bottom:4px;animation:fadeIn .9s .1s ease both;text-shadow:0 0 40px rgba(201,168,76,0.55),0 2px 12px rgba(0,0,0,0.95)}
+.splash-sub{font-family:'Cinzel',serif;font-size:13px;letter-spacing:3px;color:var(--text-dim);margin-bottom:6px;animation:fadeIn .9s .2s ease both}
 .splash-creatures{font-size:36px;letter-spacing:4px;margin-bottom:48px;animation:fadeIn 1s .3s ease both;opacity:0.8}
 .splash-btn{width:100%;max-width:280px;padding:16px;border:none;border-radius:14px;font-family:'Cinzel',serif;font-size:14px;letter-spacing:2px;cursor:pointer;transition:all .2s;margin-bottom:10px;animation:fadeIn 1s .4s ease both}
 .splash-btn-primary{background:linear-gradient(135deg,var(--purple),#a855f7);color:#fff;box-shadow:0 0 30px rgba(124,58,237,0.4)}
@@ -1949,22 +1949,26 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   </div>
 </div>
 
-<div id="splash" >
-    <div class="splash-title">WELCOME TO</div>
-    <div class="splash-name">WHAT THE<br>WILDS KEEP</div>
-    <div class="splash-sub">CREATURE CODEX</div>
-    <div style="font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;margin-top:6px;font-family:Raleway,sans-serif">v2.1</div>
-    <button id="btn-new-game" class="splash-btn splash-btn-primary">BEGIN NEW EXPEDITION</button>
-    <div class="splash-divider">
-      <div class="splash-divider-line"></div>
-      <div class="splash-divider-text">OR</div>
-      <div class="splash-divider-line"></div>
+<div id="splash">
+    <div style="width:100%;max-width:320px;text-align:center">
+      <div class="splash-title">WELCOME TO</div>
+      <div class="splash-name">WHAT THE<br>WILDS KEEP</div>
+      <div class="splash-sub">CREATURE CODEX</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.35);letter-spacing:2px;margin-top:4px;font-family:Raleway,sans-serif">v2.1</div>
     </div>
-    <button id="btn-show-continue" class="splash-btn splash-btn-secondary" onclick="showSplashContinue()" style="border:none">CONTINUE EXPEDITION</button>
-    <div class="splash-save-area" id="splash-save-area" style="display:none">
-      <textarea id="splash-code" rows="3" placeholder="Paste your save code here to continue..." autofocus></textarea>
-      <button id="btn-continue" class="splash-btn splash-btn-secondary" style="border:none">LOAD SAVE</button>
-      <div class="splash-caption">Save codes are generated from the 💾 Save / Load menu in-game</div>
+    <div style="width:100%;max-width:320px;text-align:center">
+      <button id="btn-new-game" class="splash-btn splash-btn-primary">BEGIN NEW EXPEDITION</button>
+      <div class="splash-divider">
+        <div class="splash-divider-line"></div>
+        <div class="splash-divider-text">OR</div>
+        <div class="splash-divider-line"></div>
+      </div>
+      <button id="btn-show-continue" class="splash-btn splash-btn-secondary" onclick="showSplashContinue()" style="border:none">CONTINUE EXPEDITION</button>
+      <div class="splash-save-area" id="splash-save-area" style="display:none">
+        <textarea id="splash-code" rows="3" placeholder="Paste your save code here to continue..." autofocus></textarea>
+        <button id="btn-continue" class="splash-btn splash-btn-secondary" style="border:none">LOAD SAVE</button>
+        <div class="splash-caption">Save codes are generated from the 💾 Save / Load menu in-game</div>
+      </div>
     </div>
   </div>
   <!-- AVATAR CREATION SCREEN -->
