@@ -1941,6 +1941,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 #cc-rarity{font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;margin-bottom:8px}
 #cc-name{font-family:'Cinzel',serif;font-size:26px;font-weight:700;text-shadow:0 0 40px var(--cc-glow,#f59e0b);margin-bottom:10px}
 #cc-captured-tag{font-size:9px;letter-spacing:3px;color:rgba(255,255,255,0.4);text-transform:uppercase}
+.class-tree-tier { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -3139,6 +3140,8 @@ let S = {
     pendingChoice: null,
   },
   seenHints: [],
+  attunement: 0,
+  classUnlocks: { t2: null, t3: null, t4: null },
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────
@@ -3173,6 +3176,7 @@ function checkMasteryMilestones(biomeId) {
         toast('The Warden: “' + bName + ' knows your footsteps now.”');
       }, 3000);
     } setTimeout(function(){ earnFieldNotes(FIELD_NOTE_SOURCES.biome_mastery3, bName + ' mastered'); earnEssence(1, bName + ' mastered'); }, 500);
+    setTimeout(function(){ earnAttunement(8, bName + ' mastered'); }, 600);
     // Queue journal entry if one exists
     var entry = MASTERY_ENTRIES[biomeId];
     if (entry) {
@@ -3207,7 +3211,8 @@ function typeCaptures(type) {
 function isBiomeTypeUnlocked(biomeId) {
   var req = TYPE_UNLOCK[biomeId];
   if (!req) return true;
-  return typeCaptures(req.type) >= req.count;
+  var reqCount = hasClassAbility('crt_survey') ? Math.max(0, req.count - 3) : req.count;
+  return typeCaptures(req.type) >= reqCount;
 }
 
 
@@ -3215,7 +3220,7 @@ function isBiomeUnlocked(b) {
   if (_devMode) return true;
   const r = b.req;
   if (!r) return isBiomeTypeUnlocked(b.id);
-  if (r.count !== undefined) return S.lifetime.total >= r.count && isBiomeTypeUnlocked(b.id);
+  if (r.count !== undefined) { var _reqCount = hasClassAbility('crt_survey') ? Math.max(0, r.count - 3) : r.count; return S.lifetime.total >= _reqCount && isBiomeTypeUnlocked(b.id); }
   if (r.rarity) return S.lifetime.rarities.includes(r.rarity);
   if (r.allBiomes) return BIOMES.filter(x => !x.hidden && x.id !== 'unmapped_glade').every(x => S.visited.includes(x.id));
   if (r.story) return S.story && S.story.bonusBiomes && S.story.bonusBiomes.includes(r.story);
@@ -3304,6 +3309,12 @@ function rollCreature(biome, lure, dailyBoostId) {
   if (dailyBoostId) {
     var dailyMatch = pool.find(function(c){ return c.id === dailyBoostId; });
     if (dailyMatch) finalPool.push(dailyMatch);
+  }
+  // Tidal Pull — ember/aqua creatures appear 20% more often in mixed biomes
+  if (hasClassAbility('stm_tidal') && biome && biome.types && biome.types.length > 1) {
+    var tidalBoostPool = pool.filter(function(c){ return c.type === 'ember' || c.type === 'aqua'; });
+    tidalBoostPool.forEach(function(c){ finalPool.push(c); finalPool.push(c); finalPool.push(c); finalPool.push(c); }); // extra weight ~20%
+    // (Pool is approximately 5x per ember/aqua creature, original was 1x, adds ~4 more = ~20% boost on mixed)
   }
   return finalPool[Math.floor(Math.random() * finalPool.length)];
 }
@@ -3433,6 +3444,8 @@ function catchChance(c) {
   bonus += getAbilityCatchBonus(c.type);
   if (S.activeBiome) bonus += getAbilityBiomeCatchBonus(S.activeBiome.id);
   bonus += getClassCatchBonus(c.type);
+  bonus += getClassPerfectMemoryBonus(c.id);
+  bonus += getClassChargedFieldBonus();
   bonus += (S.approachMod || 0);
 
   chance += bonus * (RARITY_BONUS_SCALE[c.rarity] || 1.0);
@@ -3606,6 +3619,8 @@ function startHunt() {
     // First hunt: extend patience window significantly
     if (c._firstHunt) { S.patiencePct = 100; }
     clearFightbackState();
+    S._emberFightbacks = 0;
+    _firstApproachUsed = false;
     S.huntCakeBondBonus = false;
     stopHuntAnim();
     renderHunt();
@@ -3699,6 +3714,7 @@ function doCapture() {
     checkTutorialTriggers();
     checkUnlocks();
     autoSave();
+    S._emberFightbacks = 0;
     clearPatienceTimer(); S.encounter = null; S.fails = 0; S.captureResult = null;
     encounterAmbienceSettle();
     renderPassiveStats();
@@ -3726,7 +3742,7 @@ function doCapture() {
     }, 620);
   } else {
     S.fails++;
-    const maxFails = Math.max(1, (FLEE_AFTER[S.encounter.rarity] || 2) + (S.huntCakeBonus || 0) + resonanceFleeModifier(S.encounter.type));
+    const maxFails = Math.max(1, (FLEE_AFTER[S.encounter.rarity] || 2) + (S.huntCakeBonus || 0) + resonanceFleeModifier(S.encounter.type) + (hasClassAbility('hnt_relent') ? 2 : 0));
     var _img2 = document.getElementById('encounter-creature-img');
     if (S.fails >= maxFails) {
       if (_img2) _img2.classList.add('creature-flee');
@@ -3736,6 +3752,8 @@ function doCapture() {
       var compDropChance = ENCOUNTER_DROP_CHANCE + getComponentDropBonus() + getChoiceCompDropBonus();
       getActiveBonds().forEach(function(b){ if(b.bonus.type==='compDrop') compDropChance += b.bonus.v; });
       if (S.activeBiome && biomeMasteryTier(S.activeBiome.id) >= 2) compDropChance += 0.15;
+      if (hasClassAbility('hnt_mark')) compDropChance = 1.0;
+      else if (hasClassAbility('crt_data')) compDropChance = Math.min(1.0, compDropChance + 0.25);
       if (Math.random() < compDropChance) {
         var escComp = makeComp(S.encounter.type, S.encounter.rarity);
         S.components.push(escComp);
@@ -3744,6 +3762,7 @@ function doCapture() {
         FX.escape(S.encounter ? S.encounter.type : 'flora');
         toast(toastEscape(S.encounter.name, null), 'escape');
       }
+      S._emberFightbacks = 0;
       clearPatienceTimer(); S.encounter = null; S.fails = 0; S.captureResult = null; updateHuntZoneType(null);
       encounterAmbienceSettle();
       setTimeout(renderHunt, 480);
@@ -4772,6 +4791,8 @@ function stateLabel(state) {
 var _patienceTimer = null;
 var _patienceStart = null;
 var _patienceDuration = 0;
+var _patienceFrozen = false;
+var _firstApproachUsed = false;
 
 function startPatienceTimer(creature) {
   clearPatienceTimer();
@@ -4780,12 +4801,17 @@ function startPatienceTimer(creature) {
   var _classPatienceMult = getClassPatienceMultiplier();
   var _abilityPatBonus = getAbilityPatienceBonus(creature.type, S.activeBiome ? S.activeBiome.id : null);
   var _abilityPatMult  = getAbilityPatienceMultiplier(creature.type);
-  _patienceDuration = ((STATE_PATIENCE[creature.rarity] || 12000) + getPatientObserverBonus() * _classPatienceMult + getChoicePatienceBonus() + _abilityPatBonus + _wardenPatBonus) * _abilityPatMult;
+  var _patientEyeMult = hasClassAbility('nrt_patient') ? 1.25 : 1.0;
+  var _ancientTimingBonus = (hasClassAbility('grv_timing') && (creature.type === 'flora' || creature.type === 'celestial')) ? 0.25 : 0.0;
+  var _oldGrowthBonus = getClassOldGrowthPatienceMs(creature.type);
+  _patienceDuration = (((STATE_PATIENCE[creature.rarity] || 12000) + getPatientObserverBonus() * _classPatienceMult + getChoicePatienceBonus() + _abilityPatBonus + _wardenPatBonus) * (1 + _ancientTimingBonus) + _oldGrowthBonus) * _abilityPatMult * _patientEyeMult;
   S.encounterState = assignInitialState(creature);
   S.patiencePct = 100;
+  _patienceFrozen = hasClassAbility('nrt_rhythm');
 
   _patienceTimer = setInterval(function() {
     if (!S.encounter) { clearPatienceTimer(); return; }
+    if (_patienceFrozen) { S.patiencePct = 100; return; }
     var elapsed = Date.now() - _patienceStart;
     var pct = Math.max(0, 100 - (elapsed / _patienceDuration) * 100);
     S.patiencePct = pct;
@@ -4965,6 +4991,13 @@ const APPROACH_DEFS = {
 
 function doApproach() {
   if (!S.encounter) return;
+  _patienceFrozen = false; // unfreeze on first approach
+
+  // First Blood — first approach costs no attempt
+  if (hasClassAbility('hnt_first') && !_firstApproachUsed) {
+    _firstApproachUsed = true;
+    S.approachAttemptCost = 0;
+  }
 
   // Apply attempt cost/grant before the roll
   if (S.approachAttemptCost === -1) {
@@ -4976,8 +5009,9 @@ function doApproach() {
   }
 
   const c = S.encounter;
-  const chance = catchChance(c); // includes state mod + S.approachMod via hook
-  const maxFails = Math.max(1, (FLEE_AFTER[c.rarity] || 2) + (S.huntCakeBonus || 0) + resonanceFleeModifier(c.type));
+  const chance = catchChance(c); // includes state mod + S.approachMod via hook — reads S._classSurge
+  S._classSurge = false; // consume surge after chance is calculated
+  const maxFails = Math.max(1, (FLEE_AFTER[c.rarity] || 2) + (S.huntCakeBonus || 0) + resonanceFleeModifier(c.type) + (hasClassAbility('hnt_relent') ? 2 : 0));
 
   if (Math.random() < chance) {
     // Success
@@ -5001,6 +5035,14 @@ function doApproach() {
     if (['rare','epic','legendary','mythic'].indexOf(captured.rarity)>=0) trackGoalProgress('catch_rare', captured.rarity);
     if (S.approachBond) trackGoalProgress('bond_creature', true);
     if (S.discovered.indexOf(captured.id) < 0) { trackGoalProgress('new_species', true); setTimeout(function(){ earnFieldNotes(FIELD_NOTE_SOURCES.first_capture, 'new species'); }, 400); }
+    // Attunement earnings
+    if (S.discovered.indexOf(captured.id) < 0) setTimeout(function(){ earnAttunement(3, 'new species'); }, 600);
+    if (S.approachBond) setTimeout(function(){ earnAttunement(5, 'bond formed'); }, 1000);
+    if (captured.unique) setTimeout(function(){ earnAttunement(10, 'unique captured'); }, 1200);
+    // Stormcaller Surge — set for next hunt on ember/aqua capture
+    if (hasClassAbility('stm_surge') && (captured.type === 'ember' || captured.type === 'aqua')) {
+      S._classSurge = true;
+    }
     if (rosterFull) { S.void_.push(captured); } else { S.roster.push(captured); }
     S.lifetime.total++;
     if (!S.lifetime.rarities.includes(captured.rarity)) S.lifetime.rarities.push(captured.rarity);
@@ -5012,6 +5054,16 @@ function doApproach() {
       S.biomeCaptures[captured.capturedIn] = (S.biomeCaptures[captured.capturedIn] || 0) + 1;
       checkMasteryMilestones(captured.capturedIn);
     }
+    // Symbiosis — +1 field note on flora/celestial capture if bonded of that type exists
+    if (hasClassAbility('grv_symbiosis')) {
+      var _symType = captured.type;
+      var _hasBondedOfType = S.roster.concat(S.void_).some(function(x){ return x.bonded && (x.type === 'flora' || x.type === 'celestial') && x.uid !== captured.uid; });
+      if ((_symType === 'flora' || _symType === 'celestial') && _hasBondedOfType) {
+        setTimeout(function(){ earnFieldNotes(1, 'Symbiosis'); }, 900);
+      }
+    }
+    // Clear ember fightback count on capture
+    S._emberFightbacks = 0;
     S.huntStreak = (S.huntStreak || 0) + 1;
     var _aImg = document.getElementById('encounter-creature-img');
     if (_aImg) _aImg.classList.add('capture-burst');
@@ -5060,6 +5112,8 @@ function doApproach() {
       var compDropChance = ENCOUNTER_DROP_CHANCE;
       getActiveBonds().forEach(function(b){ if(b.bonus.type==='compDrop') compDropChance += b.bonus.v; });
       if (S.activeBiome && biomeMasteryTier(S.activeBiome.id) >= 2) compDropChance += 0.15;
+      if (hasClassAbility('hnt_mark')) compDropChance = 1.0;
+      else if (hasClassAbility('crt_data')) compDropChance = Math.min(1.0, compDropChance + 0.25);
       if (Math.random() < compDropChance) {
         var escComp = makeComp(S.encounter.type, S.encounter.rarity);
         S.components.push(escComp);
@@ -5068,6 +5122,7 @@ function doApproach() {
         FX.escape(S.encounter ? S.encounter.type : 'flora');
         toast(S.encounter.name + ' broke free and fled!', 'escape');
       }
+      S._emberFightbacks = 0;
       updateHuntZoneType(null);
       S.encounter = null; S.fails = 0; S.captureResult = null;
       S.approachMod = 0; S.approachBond = false;
@@ -5110,8 +5165,10 @@ function triggerFightback(creature, approach) {
 
   var fightbacks = {
     ember: function() {
+      // Track charged field fightbacks
+      S._emberFightbacks = (S._emberFightbacks || 0) + 1;
       // Singes the lure — next Lure use gives no type-match bonus this encounter
-      if (getPlayerClass() === 'stormcaller' || (hasSingeResist() > 0 && Math.random() < hasSingeResist())) {
+      if (hasClassAbility('stm_fireproof') || (hasSingeResist() > 0 && Math.random() < hasSingeResist())) {
         toast(toastSingeAbsorbed());
       } else {
         S.lureSinged = true;
@@ -5844,6 +5901,7 @@ const FIELD_NOTE_SOURCES = {
 };
 
 function earnFieldNotes(amount, reason) {
+  if (hasClassAbility('sch_crossref')) amount += 1;
   S.fieldNotes = (S.fieldNotes || 0) + amount;
   toast('📋 +' + amount + ' Field Note' + (amount !== 1 ? 's' : '') + (reason ? ' — ' + reason : ''));
   autoSave();
@@ -5978,10 +6036,10 @@ function getVoidMax() {
   return VOID_MAX + getUpgradeLevel('deep_void') * 10 + getClassVoidBonus();
 }
 function getBondPersistenceBonus() {
-  return (getUpgradeLevel('bond_memory') > 0 || getPlayerClass() === 'grovekeeper') ? 0.15 : 0.10;
+  return (getUpgradeLevel('bond_memory') > 0 || hasClassAbility('grv_memory')) ? 0.15 : 0.10;
 }
 function hasFreeStalk() {
-  return getUpgradeLevel('free_stalk') > 0 || getPlayerClass() === 'hunter';
+  return getUpgradeLevel('free_stalk') > 0 || hasClassAbility('hnt_edge');
 }
 function hasKeenEye() {
   return getUpgradeLevel('keen_eye') > 0 || classHasKeenEye();
@@ -6132,12 +6190,13 @@ function buildWardenOfferPool(seed) {
     {
       tier: 'rare',
       id: 'r_patience_' + seed,
-      give: '30 Field Notes + 2 Essence',
-      giveCheck: function(){ return (S.fieldNotes||0)>=30 && (S.essence||0)>=2; },
+      give: (hasClassAbility('sch_economics') ? '20 Field Notes + 2 Essence' : '30 Field Notes + 2 Essence'),
+      giveCheck: function(){ var fnCost = hasClassAbility('sch_economics') ? 20 : 30; return (S.fieldNotes||0)>=fnCost && (S.essence||0)>=2; },
       receive: "Warden's Watch (+5s all patience)",
       note: '"Patience is a skill. You have more of it than you arrived with."',
       action: function(){
-        S.fieldNotes -= 30; S.essence -= 2;
+        var fnCost = hasClassAbility('sch_economics') ? 20 : 30;
+        S.fieldNotes -= fnCost; S.essence -= 2;
         if (!S.wardenGifts) S.wardenGifts = {};
         S.wardenGifts.patienceTokens = (S.wardenGifts.patienceTokens||0) + 1;
         showCraftResult('⌛',"Warden's Watch",'All creature patience bars +5s permanently. Stacks with other bonuses.');
@@ -6410,7 +6469,8 @@ const KEEPER_RITES = [
 function getRiteCanAfford(rite) {
   var c = rite.cost;
   var checks = {};
-  checks.essence     = !c.essence     || (S.essence    || 0) >= c.essence;
+  var _essenceCost = c.essence ? Math.max(0, c.essence - (hasClassAbility('grv_rite') ? 2 : 0)) : 0;
+  checks.essence     = !c.essence     || (S.essence    || 0) >= _essenceCost;
   checks.fieldNotes  = !c.fieldNotes  || (S.fieldNotes || 0) >= c.fieldNotes;
   checks.rareComps   = !c.rareComps   || S.components.filter(function(x){ return !x.isCakeMat && ['rare','epic','legendary','mythic'].indexOf(x.rarity) >= 0; }).length >= c.rareComps;
   checks.epicComps   = !c.epicComps   || S.components.filter(function(x){ return !x.isCakeMat && ['epic','legendary','mythic'].indexOf(x.rarity) >= 0; }).length >= c.epicComps;
@@ -6557,7 +6617,7 @@ var BOND_POOL  = { common:3, uncommon:4, rare:5, epic:6, legendary:8, mythic:10 
 
 function openBondStatModal(c) {
   _bsmUid = c.uid;
-  if (!c.bondPool) c.bondPool = (BOND_POOL[c.rarity] || 3) + Math.floor(Math.random() * 5) + 1;
+  if (!c.bondPool) c.bondPool = (BOND_POOL[c.rarity] || 3) + Math.floor(Math.random() * 5) + 1 + getClassBondPoolBonus();
   _bsmPool  = c.bondPool;
   _bsmAlloc = Object.assign({ hp:0, atk:0, def:0, spd:0, mana:0 }, c.bondPoints || {});
   _renderBondStatModal(c);
@@ -6683,6 +6743,7 @@ function _executeRite(riteId, releasedUids) {
     guaranteed: !!rite.guaranteedUnique,
   };
 
+  earnAttunement(6, 'rite completed');
   autoSave();
   renderCraft();
   renderPassiveStats();
@@ -7077,7 +7138,7 @@ function getAbilityPatienceBonus(type, biomeId) {
 
 function getAbilityPatienceMultiplier(type) {
   // Aqua attunement: 20% slower depletion
-  var slowTotal = (hasBestiaryAttunement('aqua') && type === 'aqua' ? 0.20 : 0) + (getPlayerClass() === 'stormcaller' && type === 'aqua' ? 0.20 : 0);
+  var slowTotal = (hasBestiaryAttunement('aqua') && type === 'aqua' ? 0.20 : 0) + (hasClassAbility('stm_current') && type === 'aqua' ? 0.20 : 0);
   S.roster.forEach(function(c) {
     var ab = CREATURE_ABILITIES[c.id];
     if (!ab) return;
@@ -7262,66 +7323,81 @@ function hasBestiaryAttunement(type) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CLASS ABILITIES
-// Each avatar title gives a permanent passive set.
+// CLASS TREES
+// Each avatar title has a full specialization tree unlocked via Attunement.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const CLASS_ABILITIES = {
+const CLASS_TREES = {
   naturalist: {
     label: 'Field Naturalist',
     tagline: 'The methodical observer. Everything yields to patient documentation.',
-    abilities: [
-      { name: 'Steady Hand',      desc: '+5% base catch rate on all creatures.' },
-      { name: 'Field Sense',      desc: 'Field signs always appear — never a blank hunt.' },
-      { name: 'Known Territory',  desc: 'Biome mastery bonuses are +2% higher per tier.' },
-    ],
+    t1:  { id:'nrt_rhythm',    name:"Nature's Rhythm",   desc:'Patience timer does not begin until your first approach.' },
+    t2a: { id:'nrt_steady',    name:'Steady Hand',        desc:'+5% base catch rate on all creatures.' },
+    t2b: { id:'nrt_patient',   name:'Patient Eye',        desc:'Patience drains 25% slower.' },
+    t3a: { id:'nrt_territory', name:'Known Territory',    desc:'Biome mastery bonuses +2% higher per tier.' },
+    t3b: { id:'nrt_calm',      name:'Practiced Calm',     desc:'Each failed attempt adds +3% catch chance (stacks up to 3 fails, resets on capture).' },
+    t4a: { id:'nrt_catalogue', name:'Grand Catalogue',    desc:'Each fully mastered biome adds +1% global catch rate.' },
+    t4b: { id:'nrt_memory',    name:'Perfect Memory',     desc:'Previously captured species have +8% catch rate on re-encounter.' },
   },
   scholar: {
     label: 'Runic Scholar',
     tagline: 'Knowledge applied at the moment of encounter.',
-    abilities: [
-      { name: 'Studied Eye',      desc: 'Creature rarity is revealed before engagement, even without Keen Eye.' },
-      { name: 'Archive Method',   desc: 'Bond persistence +5% per failed attempt (stacks with other bonuses).' },
-      { name: 'Field Economics',  desc: "Warden's Watch costs 10 fewer Field Notes." },
-    ],
+    t1:  { id:'sch_eye',       name:'Studied Eye',        desc:'Creature rarity is always visible, even without Keen Eye.' },
+    t2a: { id:'sch_archive',   name:'Archive Method',     desc:'Bond persistence +5% per failed attempt (stacks with other bonuses).' },
+    t2b: { id:'sch_crossref',  name:'Cross-Reference',    desc:'Field notes earned are worth +1 each.' },
+    t3a: { id:'sch_economics', name:'Field Economics',    desc:"Warden's Watch costs 10 fewer Field Notes." },
+    t3b: { id:'sch_annotated', name:'Annotated Bonds',    desc:'Newly bonded creatures get +1 bonus bond point.' },
+    t4a: { id:'sch_index',     name:'Living Index',       desc:'Each unique in your codex adds +0.05% catch rate (cumulative).' },
+    t4b: { id:'sch_study',     name:'Deep Study',         desc:'Bond pool +3 for all newly bonded creatures (stacks with rarity bonus).' },
   },
   hunter: {
     label: 'Wandering Hunter',
     tagline: 'Movement, instinct, and pressure.',
-    abilities: [
-      { name: 'Predator\'s Edge', desc: 'Stalk is always free on distracted creatures (no attempt cost, no upgrade needed).' },
-      { name: 'Streak Instinct',  desc: 'Hunt streak catch bonus doubles (+4% per consecutive capture, max +40%).' },
-      { name: 'Steel Nerves',     desc: 'All fightback chances reduced by 15%.' },
-    ],
+    t1:  { id:'hnt_edge',      name:"Predator's Edge",    desc:'Stalk costs no attempt on distracted creatures (no upgrade needed).' },
+    t2a: { id:'hnt_streak',    name:'Streak Instinct',    desc:'Hunt streak catch bonus doubles (+4% per capture, max +40%).' },
+    t2b: { id:'hnt_first',     name:'First Blood',        desc:'First approach each encounter costs no attempt.' },
+    t3a: { id:'hnt_nerves',    name:'Steel Nerves',       desc:'All fightback penalties reduced by 15%.' },
+    t3b: { id:'hnt_mark',      name:"Hunter's Mark",      desc:'Fleeing creatures always drop a component.' },
+    t4a: { id:'hnt_apex',      name:'Apex Run',           desc:'Hunt streak of 5+ grants +10% catch rate to all rarities.' },
+    t4b: { id:'hnt_relent',    name:'Relentless',         desc:'All creatures allow +2 extra flee attempts before escaping.' },
   },
   cartographer: {
     label: 'Void Cartographer',
     tagline: 'The collector. Nothing is wasted; everything is catalogued.',
-    abilities: [
-      { name: 'Deep Archive',     desc: 'Void capacity +10 from the start.' },
-      { name: 'Clean Release',    desc: 'Releasing a creature always yields 2 components instead of 1.' },
-      { name: 'Anomaly Sense',    desc: 'Unique encounter chance +0.3% passively.' },
-    ],
+    t1:  { id:'crt_archive',   name:'Deep Archive',       desc:'Void capacity +10 from the start.' },
+    t2a: { id:'crt_release',   name:'Clean Release',      desc:'Releasing a creature always yields 2 components instead of 1.' },
+    t2b: { id:'crt_survey',    name:'Survey Eye',         desc:'Hidden biome unlock requirements reduced by 3 captures.' },
+    t3a: { id:'crt_anomaly',   name:'Anomaly Sense',      desc:'Unique encounter chance +0.3% passively.' },
+    t3b: { id:'crt_data',      name:'Recovered Data',     desc:'Escaped creatures have +25% component drop chance.' },
+    t4a: { id:'crt_map',       name:'The Long Map',       desc:'Each unlocked biome grants +1 Void slot (max +8 bonus).' },
+    t4b: { id:'crt_network',   name:'Anomaly Network',    desc:'Each bonded unique adds +0.2% unique encounter chance.' },
   },
   stormcaller: {
     label: 'Storm Caller',
     tagline: 'Reads the elemental currents others miss.',
-    abilities: [
-      { name: 'Storm Affinity',   desc: 'Ember and aqua catch rates +5% each.' },
-      { name: 'Fireproof',        desc: 'Ember singe fightback never triggers.' },
-      { name: 'Current Read',     desc: 'Aqua patience bars deplete 20% slower.' },
-    ],
+    t1:  { id:'stm_affinity',  name:'Storm Affinity',     desc:'Ember and aqua catch rates +5% each.' },
+    t2a: { id:'stm_fireproof', name:'Fireproof',          desc:'Ember singe fightback never triggers.' },
+    t2b: { id:'stm_tidal',     name:'Tidal Pull',         desc:'Ember and aqua creatures appear 20% more often in mixed biomes.' },
+    t3a: { id:'stm_current',   name:'Current Read',       desc:'Aqua creature patience drains 20% slower.' },
+    t3b: { id:'stm_charged',   name:'Charged Field',      desc:'Each ember fightback adds +4% catch chance for that encounter.' },
+    t4a: { id:'stm_eye',       name:'Eye of the Storm',   desc:'Each bonded ember or aqua creature adds +1% catch rate to their type.' },
+    t4b: { id:'stm_surge',     name:'Surge',              desc:'Capturing an ember or aqua creature grants +8% catch bonus on the next hunt.' },
   },
   grovekeeper: {
     label: 'Grove Keeper',
     tagline: 'The ancient relationship between naturalist and grove.',
-    abilities: [
-      { name: 'Grove Bond',       desc: 'Flora and celestial catch rates +5% each.' },
-      { name: 'Deep Roots',       desc: 'Patient Observer effect doubled — each upgrade adds +6s patience instead of +3s.' },
-      { name: 'Keeper\'s Memory', desc: 'Bond Memory upgrade active from the start at no cost.' },
-    ],
+    t1:  { id:'grv_bond',      name:'Grove Bond',         desc:'Flora and celestial catch rates +5% each.' },
+    t2a: { id:'grv_roots',     name:'Deep Roots',         desc:'Patient Observer upgrade effect is doubled — each level adds +6s instead of +3s.' },
+    t2b: { id:'grv_timing',    name:'Ancient Timing',     desc:'Flora and celestial patience drains 25% slower.' },
+    t3a: { id:'grv_memory',    name:"Keeper's Memory",    desc:'Bond Memory upgrade active from the start at no cost.' },
+    t3b: { id:'grv_symbiosis', name:'Symbiosis',          desc:'Bonded flora or celestial creatures generate +1 field note per capture of their type.' },
+    t4a: { id:'grv_growth',    name:'Old Growth',         desc:'Each bonded flora or celestial creature adds +0.5s patience to their type encounters.' },
+    t4b: { id:'grv_rite',      name:"The Keeper's Rite",  desc:'All rite crafting costs 2 fewer essence.' },
   },
 };
+
+// Backward compat alias
+const CLASS_ABILITIES = CLASS_TREES;
 
 // ── Query functions ────────────────────────────────────────────────────────
 function getPlayerClass() {
@@ -7329,67 +7405,202 @@ function getPlayerClass() {
 }
 
 function getClassAbility() {
-  return CLASS_ABILITIES[getPlayerClass()] || CLASS_ABILITIES.naturalist;
+  return CLASS_TREES[getPlayerClass()] || CLASS_TREES.naturalist;
 }
 
 function classHas(abilityName) {
-  var cls = getClassAbility();
-  return cls.abilities.some(function(a){ return a.name === abilityName; });
+  // Legacy stub — kept for any residual calls
+  return false;
+}
+
+// ─── ATTUNEMENT SYSTEM ────────────────────────────────────────────────────
+const ATTUNEMENT_THRESHOLDS = [0, 20, 60, 130]; // levels 1-4
+
+function getAttunementLevel() {
+  var xp = S.attunement || 0;
+  for (var i = ATTUNEMENT_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= ATTUNEMENT_THRESHOLDS[i]) return i + 1;
+  }
+  return 1;
+}
+
+function earnAttunement(amount, reason) {
+  var prevLevel = getAttunementLevel();
+  S.attunement = (S.attunement || 0) + amount;
+  var newLevel = getAttunementLevel();
+  toast('🔮 +' + amount + ' Attunement' + (reason ? ' — ' + reason : ''), 'attunement');
+  if (newLevel > prevLevel) {
+    setTimeout(function() {
+      toast('✦ Attunement Level ' + newLevel + '! New specialization available.', 'levelup');
+      renderPassiveStats();
+    }, 800);
+  }
+  autoSave();
+}
+
+function hasClassAbility(id) {
+  var cls = getPlayerClass();
+  var tree = CLASS_TREES[cls];
+  if (!tree) return false;
+  if (tree.t1 && tree.t1.id === id) return true;
+  var u = S.classUnlocks || {};
+  if (u.t2 === 'a' && tree.t2a && tree.t2a.id === id) return true;
+  if (u.t2 === 'b' && tree.t2b && tree.t2b.id === id) return true;
+  if (u.t3 === 'a' && tree.t3a && tree.t3a.id === id) return true;
+  if (u.t3 === 'b' && tree.t3b && tree.t3b.id === id) return true;
+  if (u.t4 === 'a' && tree.t4a && tree.t4a.id === id) return true;
+  if (u.t4 === 'b' && tree.t4b && tree.t4b.id === id) return true;
+  return false;
+}
+
+function unlockClassTier(tier, choice) {
+  // tier: 't2'|'t3'|'t4', choice: 'a'|'b'
+  var SWITCH_COSTS = { t2: 35, t3: 90, t4: 180 };
+  var u = S.classUnlocks || (S.classUnlocks = { t2: null, t3: null, t4: null });
+  var level = getAttunementLevel();
+  var tierNum = parseInt(tier[1]);
+  if (level < tierNum) { toast('Not enough Attunement to unlock this tier.'); return; }
+  if (u[tier] === choice) return; // already chosen
+  if (u[tier] !== null) {
+    // switching — costs attunement
+    var cost = SWITCH_COSTS[tier];
+    if ((S.attunement || 0) < cost) { toast('Need ' + cost + ' Attunement to switch. You have ' + (S.attunement||0) + '.'); return; }
+    S.attunement -= cost;
+    toast('🔄 Specialization switched. −' + cost + ' Attunement.');
+  }
+  u[tier] = choice;
+  autoSave();
+  renderPassiveStats();
+}
+
+// New ability effect getters
+function getClassBondPoolBonus() {
+  var bonus = 0;
+  if (hasClassAbility('sch_annotated')) bonus += 1;
+  if (hasClassAbility('sch_study'))     bonus += 3;
+  return bonus;
+}
+
+function getClassLivingIndexBonus() {
+  if (!hasClassAbility('sch_index')) return 0;
+  var uniqCount = S.roster.concat(S.void_).filter(function(c){ return c.unique; }).length;
+  return uniqCount * 0.0005;
+}
+
+function getClassPerfectMemoryBonus(creatureId) {
+  if (!hasClassAbility('nrt_memory')) return 0;
+  return (S.discovered && S.discovered.indexOf(creatureId) >= 0) ? 0.08 : 0;
+}
+
+function getClassPracticedCalmBonus() {
+  if (!hasClassAbility('nrt_calm')) return 0;
+  return Math.min(S.fails || 0, 3) * 0.03;
+}
+
+function getClassGrandCatalogueBonus() {
+  if (!hasClassAbility('nrt_catalogue')) return 0;
+  var mastered = BIOMES.filter(function(b){ return biomeMasteryTier(b.id) >= 3; }).length;
+  return mastered * 0.01;
+}
+
+function getClassApexRunBonus() {
+  if (!hasClassAbility('hnt_apex')) return 0;
+  return (S.huntStreak || 0) >= 5 ? 0.10 : 0;
+}
+
+function getClassEyeOfStormBonus(type) {
+  if (!hasClassAbility('stm_eye')) return 0;
+  if (type !== 'ember' && type !== 'aqua') return 0;
+  var count = S.roster.concat(S.void_).filter(function(c){ return c.bonded && c.type === type; }).length;
+  return count * 0.01;
+}
+
+function getClassSurgeBonus() {
+  if (!hasClassAbility('stm_surge')) return 0;
+  return S._classSurge ? 0.08 : 0;
+}
+
+function getClassAnomalyNetworkBonus() {
+  if (!hasClassAbility('crt_network')) return 0;
+  var bondedUniques = S.roster.concat(S.void_).filter(function(c){ return c.bonded && c.unique; }).length;
+  return bondedUniques * 0.002;
+}
+
+function getClassChargedFieldBonus() {
+  if (!hasClassAbility('stm_charged')) return 0;
+  return Math.min(S._emberFightbacks || 0, 5) * 0.04;
+}
+
+function getClassOldGrowthPatienceMs(type) {
+  if (!hasClassAbility('grv_growth')) return 0;
+  if (type !== 'flora' && type !== 'celestial') return 0;
+  var count = S.roster.concat(S.void_).filter(function(c){ return c.bonded && (c.type === 'flora' || c.type === 'celestial'); }).length;
+  return count * 500; // 0.5s per bonded flora/celestial
 }
 
 // Catch bonus from class
 function getClassCatchBonus(type) {
-  var cls = getPlayerClass();
   var bonus = 0;
-  if (cls === 'naturalist') bonus += 0.05;
-  if (cls === 'stormcaller' && (type === 'ember' || type === 'aqua')) bonus += 0.05;
-  if (cls === 'grovekeeper' && (type === 'flora' || type === 'celestial')) bonus += 0.05;
+  if (hasClassAbility('nrt_steady')) bonus += 0.05;
+  if (hasClassAbility('stm_affinity') && (type === 'ember' || type === 'aqua')) bonus += 0.05;
+  if (hasClassAbility('grv_bond') && (type === 'flora' || type === 'celestial')) bonus += 0.05;
+  bonus += getClassEyeOfStormBonus(type);
+  bonus += getClassSurgeBonus();
+  bonus += getClassApexRunBonus();
+  bonus += getClassPracticedCalmBonus();
+  bonus += getClassGrandCatalogueBonus();
+  bonus += getClassLivingIndexBonus();
   return bonus;
 }
 
 // Unique chance bonus from class
 function getClassUniqueBonus() {
-  return getPlayerClass() === 'cartographer' ? 0.003 : 0;
+  return (hasClassAbility('crt_anomaly') ? 0.003 : 0) + getClassAnomalyNetworkBonus();
 }
 
 // Streak multiplier from class
 function getClassStreakMultiplier() {
-  return getPlayerClass() === 'hunter' ? 2 : 1;
+  return hasClassAbility('hnt_streak') ? 2 : 1;
 }
 
 // Fightback reduction from class
 function getClassFightbackReduction() {
-  return getPlayerClass() === 'hunter' ? 0.15 : 0;
+  return hasClassAbility('hnt_nerves') ? 0.15 : 0;
 }
 
 // Patience multiplier from class (Grove Keeper doubles Patient Observer)
 function getClassPatienceMultiplier() {
-  return getPlayerClass() === 'grovekeeper' ? 2.0 : 1.0;
+  return hasClassAbility('grv_roots') ? 2.0 : 1.0;
 }
 
 // Release component count
 function getClassReleaseCount() {
-  return getPlayerClass() === 'cartographer' ? 2 : 1;
+  return hasClassAbility('crt_release') ? 2 : 1;
 }
 
 // Void bonus from class
 function getClassVoidBonus() {
-  return getPlayerClass() === 'cartographer' ? 10 : 0;
+  var bonus = hasClassAbility('crt_archive') ? 10 : 0;
+  if (hasClassAbility('crt_map')) {
+    var unlockedBiomes = BIOMES.filter(function(b){ return !b.hidden || (S.visited && S.visited.indexOf(b.id) >= 0) || biomeMasteryTier(b.id) > 0; }).length;
+    bonus += Math.min(8, unlockedBiomes);
+  }
+  return bonus;
 }
 
 // Bond persistence bonus from class
 function getClassBondBonus() {
-  return getPlayerClass() === 'scholar' ? 0.05 : 0;
+  return hasClassAbility('sch_archive') ? 0.05 : 0;
 }
 
 // Mastery bonus modifier
 function getClassMasteryMod() {
-  return getPlayerClass() === 'naturalist' ? 0.02 : 0;
+  return hasClassAbility('nrt_territory') ? 0.02 : 0;
 }
 
 // Scholar: always show rarity (like Keen Eye)
 function classHasKeenEye() {
-  return getPlayerClass() === 'scholar';
+  return hasClassAbility('sch_eye');
 }
 
 // ─── CLASS CARD ───────────────────────────────────────────────────────────
@@ -7400,51 +7611,85 @@ const CLASS_ICONS = {
 
 function buildClassCard() {
   var cls  = getPlayerClass();
-  var ab   = CLASS_ABILITIES[cls];
-  if (!ab) return '';
+  var tree = CLASS_TREES[cls];
+  if (!tree) return '';
   var icon = CLASS_ICONS[cls] || '⚔';
+  var attn  = S.attunement || 0;
+  var level = getAttunementLevel();
+  var u     = S.classUnlocks || {};
+  var THRESHOLDS = ATTUNEMENT_THRESHOLDS;
+  var SWITCH_COSTS = { t2: 35, t3: 90, t4: 180 };
 
-  // Determine which abilities are currently "active" (have live bonuses)
-  function isActive(name) {
-    switch(name) {
-      case 'Steady Hand':      return true;
-      case 'Field Sense':      return true;
-      case 'Known Territory':  return true;
-      case 'Studied Eye':      return true;
-      case "Archive Method":   return true;
-      case 'Field Economics':  return true;
-      case "Predator's Edge":  return true;
-      case 'Streak Instinct':  return (S.huntStreak||0) > 0;
-      case 'Steel Nerves':     return true;
-      case 'Deep Archive':     return true;
-      case 'Clean Release':    return true;
-      case 'Anomaly Sense':    return true;
-      case 'Storm Affinity':   return true;
-      case 'Fireproof':        return true;
-      case 'Current Read':     return true;
-      case 'Grove Bond':       return true;
-      case 'Deep Roots':       return getUpgradeLevel('patient_observer') > 0;
-      case "Keeper's Memory":  return true;
-      default: return false;
+  // Attunement bar
+  var nextThresh = THRESHOLDS[level] || THRESHOLDS[THRESHOLDS.length-1];
+  var prevThresh = THRESHOLDS[level-1] || 0;
+  var barPct = level >= 4 ? 100 : Math.round(((attn - prevThresh) / (nextThresh - prevThresh)) * 100);
+  var attnBar = level >= 4
+    ? '<div style="font-size:9px;color:var(--gold);letter-spacing:1px;margin-top:4px">MAX ATTUNEMENT</div>'
+    : '<div style="margin-top:6px"><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:3px"><span>🔮 ATTUNEMENT</span><span>' + attn + ' / ' + nextThresh + '</span></div><div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px"><div style="height:4px;width:' + barPct + '%;background:var(--gold);border-radius:2px;transition:width .4s"></div></div></div>';
+
+  function tierRow(tierKey, choiceKey) {
+    // For t1 the key is just 't1', not 't1a'
+    var ab = (tierKey === 't1') ? tree.t1 : tree[tierKey + choiceKey];
+    if (!ab) return '';
+    var isChosen = (tierKey === 't1') ? true : (u[tierKey] === choiceKey); // t1 is always active
+    var tierNum = parseInt(tierKey[1]);
+    var canUnlock = level >= tierNum;
+    var alreadyHasOther = u[tierKey] && u[tierKey] !== choiceKey;
+    var switchCost = SWITCH_COSTS[tierKey];
+    var canSwitch  = alreadyHasOther && (attn >= switchCost);
+
+    var borderCol = isChosen ? 'var(--gold)' : (canUnlock ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)');
+    var bgCol     = isChosen ? 'rgba(201,168,76,0.08)' : 'transparent';
+    var nameCol   = isChosen ? 'var(--gold)' : (canUnlock ? 'var(--text)' : 'var(--text-dim)');
+    var opacity   = canUnlock ? 1 : 0.45;
+
+    var badge = isChosen ? '<span style="font-size:8px;letter-spacing:1px;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 5px;margin-left:6px">ACTIVE</span>' : '';
+    var btn = '';
+    if (tierKey !== 't1') {
+      if (!isChosen && canUnlock && !u[tierKey]) {
+        btn = '<button onclick="unlockClassTier(\'' + tierKey + '\',\'' + choiceKey + '\');renderPassiveStats()" style="margin-top:6px;padding:4px 12px;background:rgba(201,168,76,0.12);border:1px solid var(--gold);border-radius:6px;color:var(--gold);font-size:10px;letter-spacing:1px;cursor:pointer">CHOOSE</button>';
+      } else if (!isChosen && alreadyHasOther && level >= tierNum) {
+        btn = '<button onclick="unlockClassTier(\'' + tierKey + '\',\'' + choiceKey + '\');renderPassiveStats()" style="margin-top:6px;padding:4px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:' + (canSwitch ? 'var(--text-muted)' : '#555') + ';font-size:10px;cursor:pointer' + (canSwitch ? '' : ';opacity:0.5') + '">SWITCH (−' + switchCost + ' attn)</button>';
+      }
     }
+
+    return '<div style="border:1px solid ' + borderCol + ';border-radius:10px;padding:10px 12px;background:' + bgCol + ';opacity:' + opacity + ';flex:1;min-width:0">'
+      + '<div style="font-size:11px;font-weight:700;color:' + nameCol + ';font-family:Cinzel,serif">' + ab.name + badge + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:3px;line-height:1.5">' + ab.desc + '</div>'
+      + btn
+      + '</div>';
   }
 
-  var rows = ab.abilities.map(function(a) {
-    var active = isActive(a.name);
-    return '<div class="class-ability-row">'
-      + '<span class="class-ability-row-name">' + a.name + '</span>'
-      + (active ? '<span class="class-ability-active">Active</span>' : '')
-      + '<span class="class-ability-row-desc">' + a.desc + '</span>'
+  function tier(tierKey, label) {
+    var tierNum = parseInt(tierKey[1]);
+    var isUnlocked = level >= tierNum;
+    var locked = !isUnlocked;
+
+    var header = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+      + '<div style="font-size:8px;letter-spacing:2px;color:' + (isUnlocked ? 'var(--gold-dim)' : 'rgba(255,255,255,0.2)') + '">' + label + '</div>'
+      + (locked ? '<div style="font-size:8px;color:rgba(255,255,255,0.2)">— unlock at ' + THRESHOLDS[tierNum-1] + ' attunement</div>' : '')
       + '</div>';
-  }).join('');
+
+    return '<div style="margin-top:10px">'
+      + header
+      + '<div style="display:flex;gap:8px">'
+      + tierRow(tierKey, 'a')
+      + (tierNum > 1 ? tierRow(tierKey, 'b') : '')
+      + '</div></div>';
+  }
 
   return '<div class="class-card">'
     + '<div class="class-card-header">'
     + '<span class="class-card-icon">' + icon + '</span>'
-    + '<div><div class="class-card-name">' + ab.label + '</div>'
-    + '<div class="class-card-tagline">' + ab.tagline + '</div></div>'
+    + '<div><div class="class-card-name">' + tree.label + '</div>'
+    + '<div class="class-card-tagline">' + tree.tagline + '</div></div>'
     + '</div>'
-    + rows
+    + attnBar
+    + tier('t1', 'TIER I — BASE')
+    + tier('t2', 'TIER II — SPECIALIZATION')
+    + tier('t3', 'TIER III — MASTERY')
+    + tier('t4', 'TIER IV — CAPSTONE')
     + '</div>';
 }
 
@@ -7503,10 +7748,9 @@ function buildCaptureContextNote(c) {
     var ab = getRosterAbilityIds().map(function(id){return CREATURE_ABILITIES[id];}).find(function(a){ return a && a.type==='state_bias' && (!a.creatureType||a.creatureType===c.type); });
     if (ab) notes.push(ab.name + ' — started distracted');
   }
-  var classKey = getPlayerClass();
-  if (classKey === 'stormcaller' && (c.type === 'ember' || c.type === 'aqua')) notes.push('Storm Affinity active');
-  if (classKey === 'grovekeeper' && (c.type === 'flora' || c.type === 'celestial')) notes.push('Grove Bond active');
-  if (classKey === 'naturalist') notes.push('Steady Hand');
+  if (hasClassAbility('stm_affinity') && (c.type === 'ember' || c.type === 'aqua')) notes.push('Storm Affinity active');
+  if (hasClassAbility('grv_bond') && (c.type === 'flora' || c.type === 'celestial')) notes.push('Grove Bond active');
+  if (hasClassAbility('nrt_steady')) notes.push('Steady Hand');
   var dailyC = getDailySighting();
   if (dailyC && dailyC.id === c.id) notes.push('Daily sighting ✓');
   if (S.huntStreak >= 5) notes.push(S.huntStreak + '-streak bonus');
@@ -8535,7 +8779,7 @@ function renderHunt() {
     const col = c.unique ? c.unique.color : rc.color;
     const chance = catchChance(c);
     const _resMod = resonanceFleeModifier(c.type);
-    const maxFails = Math.max(1, (FLEE_AFTER[c.rarity] || 2) + (S.huntCakeBonus || 0) + _resMod);
+    const maxFails = Math.max(1, (FLEE_AFTER[c.rarity] || 2) + (S.huntCakeBonus || 0) + _resMod + (hasClassAbility('hnt_relent') ? 2 : 0));
     const dots = Array.from({length:maxFails}, (_,i) =>
       `<div class="attempt-dot ${i < maxFails - S.fails ? 'active' : ''}"></div>`).join('');
     const _initState = S.encounterState || assignInitialState(c);
@@ -9555,7 +9799,10 @@ function buildSaveData() {
     creatureMemory: S.creatureMemory||{},
     dailySightings: S.dailySightings||{}, weeklyProgress: S.weeklyProgress||{},
     seenHints: S.seenHints||[],
-    activeBiomeId: S.activeBiome ? S.activeBiome.id : null, v: 1
+    activeBiomeId: S.activeBiome ? S.activeBiome.id : null,
+    attunement: S.attunement || 0,
+    classUnlocks: S.classUnlocks || { t2: null, t3: null, t4: null },
+    v: 1
   };
 }
 
@@ -9665,13 +9912,14 @@ function selectAvTitle(el, key) {
 }
 
 function showClassAbilityPreview(key) {
-  var ab = CLASS_ABILITIES[key];
+  var ab = CLASS_TREES[key];
   var preview = document.getElementById('class-ability-preview');
   if (!preview || !ab) return;
-  preview.innerHTML = '<div class="class-ability-header">' + ab.label + ' — ' + ab.tagline + '</div>'
-    + ab.abilities.map(function(a) {
-        return '<div style="margin-bottom:4px"><strong>' + a.name + '</strong> — ' + a.desc + '</div>';
-      }).join('');
+  var t1 = ab.t1 ? '<div style="margin-bottom:4px"><strong>' + ab.t1.name + '</strong> (Base) — ' + ab.t1.desc + '</div>' : '';
+  var t2 = (ab.t2a || ab.t2b) ? '<div style="margin-bottom:4px;color:var(--text-muted);font-size:10px;letter-spacing:1px">TIER II — pick one on first specialization</div>' : '';
+  if (ab.t2a) t2 += '<div style="margin-bottom:4px"><strong>' + ab.t2a.name + '</strong> — ' + ab.t2a.desc + '</div>';
+  if (ab.t2b) t2 += '<div style="margin-bottom:4px"><strong>' + ab.t2b.name + '</strong> — ' + ab.t2b.desc + '</div>';
+  preview.innerHTML = '<div class="class-ability-header">' + ab.label + ' — ' + ab.tagline + '</div>' + t1 + t2;
 }
 
 function selectAvTone(el, hex, name) {
@@ -9769,6 +10017,18 @@ function applyData(data) {
   S.weeklyProgress  = data.weeklyProgress  || {};
   S.seenHints       = data.seenHints       || [];
   S.activeBiome = data.activeBiomeId ? (BIOMES.find(function(b){ return b.id===data.activeBiomeId; })||null) : null;
+  // Attunement — backfill for existing saves
+  S.classUnlocks = data.classUnlocks || { t2: null, t3: null, t4: null };
+  if (data.attunement != null) {
+    S.attunement = data.attunement;
+  } else {
+    // Backfill from game state
+    var _bondedCount = (S.roster||[]).concat(S.void_||[]).filter(function(c){ return c.bonded; }).length;
+    var _uniqueCount = (S.roster||[]).concat(S.void_||[]).filter(function(c){ return c.unique; }).length;
+    var _masteredCount = 0;
+    try { _masteredCount = BIOMES.filter(function(b){ return biomeMasteryTier(b.id) >= 3; }).length; } catch(e) {}
+    S.attunement = ((S.discovered||[]).length * 3) + (_bondedCount * 5) + (_uniqueCount * 10) + (_masteredCount * 8);
+  }
   var stacks = {};
   (data.lures||[]).forEach(function(l) {
     var r = l.rarity;
