@@ -1596,6 +1596,13 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   font-size: 8px; letter-spacing: 2px; color: var(--gold-dim);
   margin-bottom: 4px; font-style: normal; text-transform: uppercase;
 }
+.class-pill {
+  display:flex;align-items:center;gap:7px;padding:5px 10px 5px 8px;
+  background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.18);
+  border-radius:20px;cursor:pointer;font-family:Raleway,sans-serif;
+  transition:background .15s;width:100%;box-sizing:border-box;
+}
+.class-pill:active{background:rgba(201,168,76,0.14)}
 
 /* ── CLASS CARD ──────────────────────────────────────────── */
 .class-card {
@@ -2150,6 +2157,17 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   </div>
   <div id="tutorial-notif">🖊 Field Guide entry added</div>
   <div id="coach-layer"></div>
+
+  <!-- CLASS MODAL -->
+  <div id="class-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:710;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeClassModal()">
+    <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:80vh;overflow-y:auto;padding:20px 16px calc(env(safe-area-inset-bottom,0px) + 24px)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-family:Cinzel,serif;font-size:12px;letter-spacing:2px;color:var(--gold)">EXPLORER CLASS</div>
+        <button onclick="closeClassModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+      </div>
+      <div id="class-modal-content"></div>
+    </div>
+  </div>
 
   <!-- OPTIONS MENU -->
   <div id="options-menu" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:750;align-items:flex-end;justify-content:center;padding:0">
@@ -4328,7 +4346,6 @@ function renderPassiveStats() {
   // Choice passives summary
   var _cp = getChoicePassiveTotals();
   var _choiceHtml = '';
-  var _clsPill = buildClassCard();
   if (S.story.choices && S.story.choices.length > 0) {
     var _cpParts = [];
     if (_cp.catchBonus > 0)    _cpParts.push('+' + Math.round(_cp.catchBonus*100) + '% catch');
@@ -4348,9 +4365,46 @@ function renderPassiveStats() {
   el.innerHTML = Object.entries(ts).map(([k,v]) =>
     `<div class="stat-pill">${STAT_ICONS[k]} <span class="stat-val">${v}</span></div>`
   ).join('') + bondHtml + streakHtml + _choiceHtml + _currBar;
-  // Class card in its own area
+  // Compact class pill in header
   var _cca = document.getElementById('class-card-area');
-  if (_cca) _cca.innerHTML = _clsPill;
+  if (_cca) {
+    var _tree = S.avatar && CLASS_TREES[S.avatar.title];
+    if (_tree) {
+      var _classIcons = {naturalist:'🌿',scholar:'📚',hunter:'🗡️',cartographer:'📐',stormcaller:'⚡',grovekeeper:'🌳'};
+      var _icon = _classIcons[S.avatar.title] || '◈';
+      _cca.innerHTML = '<div class="class-pill" onclick="openClassModal()">'
+        + '<span style="font-size:13px">' + _icon + '</span>'
+        + '<span style="font-size:11px;font-weight:600;color:var(--text)">' + _tree.label + '</span>'
+        + '<span style="font-size:10px;color:var(--gold-dim)">· ' + (S.attunement||0) + ' attn</span>'
+        + '<span style="font-size:14px;color:var(--text-muted);margin-left:auto;line-height:1">›</span>'
+        + '</div>';
+    } else {
+      _cca.innerHTML = '';
+    }
+  }
+}
+
+function _updateClassCard() {
+  renderPassiveStats();
+  var cm = document.getElementById('class-modal');
+  if (cm && cm.style.display === 'flex') {
+    var cmc = document.getElementById('class-modal-content');
+    if (cmc) cmc.innerHTML = buildClassCard();
+  }
+  if (S.tab === 'roster') renderRoster();
+}
+
+function openClassModal() {
+  var modal = document.getElementById('class-modal');
+  var content = document.getElementById('class-modal-content');
+  if (!modal || !content) return;
+  content.innerHTML = buildClassCard();
+  modal.style.display = 'flex';
+}
+
+function closeClassModal() {
+  var modal = document.getElementById('class-modal');
+  if (modal) modal.style.display = 'none';
 }
 
 function confirmRelease(uid, fromVoid) {
@@ -7702,9 +7756,9 @@ function buildClassCard() {
     var btn = '';
     if (tierKey !== 't1') {
       if (!isChosen && canUnlock && !u[tierKey]) {
-        btn = '<button onclick="unlockClassTier(\'' + tierKey + '\',\'' + choiceKey + '\');renderPassiveStats()" style="margin-top:6px;padding:4px 12px;background:rgba(201,168,76,0.12);border:1px solid var(--gold);border-radius:6px;color:var(--gold);font-size:10px;letter-spacing:1px;cursor:pointer">CHOOSE</button>';
+        btn = '<button onclick="unlockClassTier(\'' + tierKey + '\',\'' + choiceKey + '\');_updateClassCard()" style="margin-top:6px;padding:4px 12px;background:rgba(201,168,76,0.12);border:1px solid var(--gold);border-radius:6px;color:var(--gold);font-size:10px;letter-spacing:1px;cursor:pointer">CHOOSE</button>';
       } else if (!isChosen && alreadyHasOther && level >= tierNum) {
-        btn = '<button onclick="unlockClassTier(\'' + tierKey + '\',\'' + choiceKey + '\');renderPassiveStats()" style="margin-top:6px;padding:4px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:' + (canSwitch ? 'var(--text-muted)' : '#555') + ';font-size:10px;cursor:pointer' + (canSwitch ? '' : ';opacity:0.5') + '">SWITCH (−' + switchCost + ' attn)</button>';
+        btn = '<button onclick="unlockClassTier(\'' + tierKey + '\',\'' + choiceKey + '\');_updateClassCard()" style="margin-top:6px;padding:4px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:' + (canSwitch ? 'var(--text-muted)' : '#555') + ';font-size:10px;cursor:pointer' + (canSwitch ? '' : ';opacity:0.5') + '">SWITCH (−' + switchCost + ' attn)</button>';
       }
     }
 
@@ -9369,6 +9423,7 @@ function renderRoster() {
     + (S.roster.length>=rosterMax ? ' · Full' : '')
     + '</span></div>'
     + overview
+    + buildClassCard()
     + renderByRarity(S.roster, false);
   setTimeout(_checkRosterCoachMarks, 100);
 }
